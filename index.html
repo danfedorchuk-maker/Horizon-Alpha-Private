@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>THE PHILOLOGY LAB | MARKET INTELLIGENCE</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        body { background-color: #000; color: #d4af37; font-family: 'Courier New', monospace; margin: 0; padding: 20px; line-height: 1.6; }
+        .container { max-width: 900px; margin: auto; border: 1px solid #333; padding: 40px; background: #050505; box-shadow: 0 0 30px rgba(212, 175, 55, 0.05); }
+        h1 { text-align: center; letter-spacing: 5px; border-bottom: 2px solid #d4af37; padding-bottom: 20px; color: #d4af37; }
+        .input-group { margin: 20px 0; display: flex; flex-direction: column; gap: 15px; }
+        select, input { background: #111; border: 1px solid #d4af37; color: #d4af37; padding: 12px; font-family: inherit; font-size: 1rem; }
+        button { background: #d4af37; color: #000; border: none; padding: 15px; cursor: pointer; font-weight: bold; letter-spacing: 2px; transition: 0.3s; }
+        button:hover { background: #fff; box-shadow: 0 0 15px #d4af37; }
+        #output { margin-top: 30px; border-top: 1px double #333; padding-top: 20px; min-height: 200px; color: #ccc; }
+        .disclaimer { font-size: 0.7rem; color: #666; text-align: center; margin-top: 40px; border-top: 1px solid #222; padding-top: 10px; }
+        .nav { text-align: center; margin-bottom: 20px; }
+        .nav a { color: #888; text-decoration: none; font-size: 0.8rem; margin: 0 15px; }
+        .nav a:hover { color: #d4af37; }
+    </style>
+</head>
+<body>
+
+<div class="nav">
+    <a href="index.html">← RETURN TO SCHOLARLY LAB</a>
+</div>
+
+<div class="container">
+    <h1>MARKET INTELLIGENCE TERMINAL</h1>
+    <p style="text-align:center; font-size: 0.8rem; color: #888;">INSTITUTIONAL POSITIONING & LIQUIDITY ANALYSIS</p>
+
+    <div class="input-group">
+        <label>Select Asset / Commodity:</label>
+       <select id="asset" style="height: 450px; background:#000; color:#00ff41; border: 1px solid #00ff41; font-family: 'Courier New', monospace;" size="20">
+    <optgroup label="THE 7 MAJORS (USD CORE)">
+        <option value="AUD/USD">AUD/USD (Aussie)</option>
+        <option value="EUR/USD">EUR/USD (Fiber)</option>
+        <option value="GBP/USD">GBP/USD (Cable)</option>
+        <option value="NZD/USD">NZD/USD (Kiwi)</option>
+        <option value="USD/CAD">USD/CAD (Loonie)</option>
+        <option value="USD/CHF">USD/CHF (Swissie)</option>
+        <option value="USD/JPY">USD/JPY (Gopher)</option>
+    </optgroup>
+    <optgroup label="THE 21 CROSSES (GLOBAL LIQUIDITY)">
+        <option value="AUD/CAD">AUD/CAD</option>
+        <option value="AUD/CHF">AUD/CHF</option>
+        <option value="AUD/JPY">AUD/JPY</option>
+        <option value="AUD/NZD">AUD/NZD</option>
+        <option value="CAD/CHF">CAD/CHF</option>
+        <option value="CAD/JPY">CAD/JPY</option>
+        <option value="CHF/JPY">CHF/JPY</option>
+        <option value="EUR/AUD">EUR/AUD</option>
+        <option value="EUR/CAD">EUR/CAD</option>
+        <option value="EUR/CHF">EUR/CHF</option>
+        <option value="EUR/GBP">EUR/GBP</option>
+        <option value="EUR/JPY">EUR/JPY</option>
+        <option value="EUR/NZD">EUR/NZD</option>
+        <option value="GBP/AUD">GBP/AUD</option>
+        <option value="GBP/CAD">GBP/CAD</option>
+        <option value="GBP/CHF">GBP/CHF</option>
+        <option value="GBP/JPY">GBP/JPY</option>
+        <option value="GBP/NZD">GBP/NZD</option>
+        <option value="NZD/CAD">NZD/CAD</option>
+        <option value="NZD/CHF">NZD/CHF</option>
+        <option value="NZD/JPY">NZD/JPY</option>
+    </optgroup>
+    <optgroup label="SHADOW MARKETS & COMMODITIES">
+        <option value="BALTIC DRY INDEX">Baltic Dry Index (BDI)</option>
+        <option value="STRAIT OF HORMUZ">Hormuz Transit/Risk Data</option>
+        <option value="XAU/USD">Gold Spot (Hard Assets)</option>
+        <option value="WTI CRUDE OIL">Energy: WTI Crude</option>
+        <option value="COPPER">Industrial: High Grade Copper</option>
+        <option value="CONTAINER FREIGHT INDEX">SCFI Container Rates</option>
+    </optgroup>
+           <optgroup label="DIGITAL ASSETS (CRYPTO)">
+    <option value="BTC/USD">Bitcoin (Digital Gold)</option>
+    <option value="ETH/USD">Ethereum (Smart Contract Flow)</option>
+</optgroup>
+         <optgroup label="GLOBAL EQUITY INDICES">
+    <option value="S&P 500 (SPX)">S&P 500 (The Market)</option>
+    <option value="NASDAQ 100 (NDX)">NASDAQ 100 (Tech Heavy)</option>
+    <option value="DOW JONES (DJI)">Dow Jones 30 (Blue Chips)</option>
+    <option value="RUSSELL 2000 (RUT)">Russell 2000 (Small Caps)</option>
+    <option value="S&P/TSX COMPOSITE">S&P/TSX (Canada Market)</option>
+    <option value="NIKKEI 225 (NI225)">Nikkei 225 (Japan)</option>
+    <option value="DAX 40 (DAX)">DAX 40 (Germany)</option>
+    <option value="VIX (THE FEAR GAUGE)">VIX (Volatility Index)</option>
+</optgroup>
+</select>
+
+        <label>Intelligence Pillar:</label>
+        <select id="pillar">
+            <option value="Institutional Positioning (COT Data)">Institutional Positioning (COT Data)</option>
+            <option value="Liquidity & Order Flow Clusters">Liquidity & Order Flow Clusters</option>
+            <option value="Macro Sentiment (Central Bank Tone)">Macro Sentiment (Central Bank Tone)</option>
+            <option value="Full Market Briefing">Full Market Briefing</option>
+            <option value="Shadow Logistics (Hormuz/BDI Impact)">Shadow Logistics (Hormuz/BDI Impact)</option>
+<option value="Options Flow & Pinning Risk">Options Flow & Pinning Risk</option>
+        </select>
+
+        <button onclick="generateIntelligence()">EXECUTE MARKET SCAN</button>
+    </div>
+
+    <div id="output">SYSTEM STATUS: READY. Awaiting asset selection...</div>
+
+    
+
+    <div class="disclaimer">
+        FOR RESEARCH PURPOSES ONLY. NO FINANCIAL ADVICE GIVEN. ALL DECISIONS ARE THE RESPONSIBILITY OF THE USER. 
+        NOT AFFILIATED WITH ANY FINANCIAL REGULATORY BODY.
+    </div>
+</div>
+
+<script>
+async function generateIntelligence() {
+    const asset = document.getElementById('asset').value;
+    const pillar = document.getElementById('pillar').value;
+    const output = document.getElementById('output');
+
+    const hasPaid = confirm("MARKET DATA GATE: Have you purchased an access tier today?");
+    if (!hasPaid) return;
+
+    output.innerHTML = "<i style='color:#d4af37;'>Accessing CFTC and Institutional repositories... Scanning for whale signatures...</i>";
+
+    try {
+        const response = await fetch('/api/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                word: asset, 
+                tradition: "Market Intelligence Analyst focusing on Order Flow and Bank Positioning", 
+                lang: "Institutional Research English" 
+            })
+        });
+
+        const data = await response.json();
+        if (data.candidates) {
+            output.innerHTML = marked.parse(data.candidates[0].content.parts[0].text);
+        }
+    } catch (e) {
+        output.innerHTML = "CONNECTION ERROR: DATA FEED INTERRUPTED.";
+    }
+}
+</script>
+
+</body>
