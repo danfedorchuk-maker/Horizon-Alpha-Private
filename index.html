@@ -145,8 +145,10 @@ async function generateIntelligence() {
         });
 
         const data = await response.json();
-        if (data.candidates) {
-            output.innerHTML = marked.parse(data.candidates[0].content.parts[0].text);
+       if (data.result) {
+            output.innerHTML = marked.parse(data.result);
+        } else if (data.error) {
+            output.innerHTML = "SYSTEM ERROR: " + data.error;
         }
     } catch (e) {
         output.innerHTML = "CONNECTION ERROR: DATA FEED INTERRUPTED.";
