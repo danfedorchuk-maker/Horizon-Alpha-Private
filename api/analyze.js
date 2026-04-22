@@ -1,9 +1,9 @@
 export default async function handler(req, res) {
   const apiKey = process.env.API_KEY;
-  const { word } = req.body;
+  const word = req.body.word || "Market Asset";
 
   if (!apiKey) {
-    return res.status(200).json({ result: "SYSTEM ERROR: API_KEY missing from Vercel Settings." });
+    return res.status(200).json({ result: "SYSTEM ERROR: API_KEY is missing from Vercel Settings. Add it and redeploy." });
   }
 
   try {
@@ -11,20 +11,20 @@ export default async function handler(req, res) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: "Brief institutional market analysis for: " + word }] }]
+        contents: [{ parts: [{ text: "Provide a professional institutional market scan for: " + word }] }]
       })
     });
 
     const data = await response.json();
-
+    
     if (data.error) {
-      return res.status(200).json({ result: "GATEWAY ERROR: " + data.error.message });
+      return res.status(200).json({ result: "GOOGLE ERROR: " + data.error.message });
     }
 
-    const resultText = data.candidates[0].content.parts[0].text;
-    res.status(200).json({ result: resultText });
+    const result = data.candidates[0].content.parts[0].text;
+    return res.status(200).json({ result: result });
 
-  } catch (error) {
-    res.status(200).json({ result: "CONNECTION ERROR: Terminal timed out. Check Vercel logs." });
+  } catch (err) {
+    return res.status(200).json({ result: "CONNECTION ERROR: " + err.message });
   }
 }
