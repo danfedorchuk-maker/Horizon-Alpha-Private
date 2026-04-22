@@ -129,8 +129,7 @@ async function generateIntelligence() {
     const pillar = document.getElementById('pillar').value;
     const output = document.getElementById('output');
 
-    const hasPaid = confirm("MARKET DATA GATE: Have you purchased an access tier today?");
-    if (!hasPaid) return;
+   
 
     output.innerHTML = "<i style='color:#d4af37;'>Accessing CFTC and Institutional repositories... Scanning for whale signatures...</i>";
 
