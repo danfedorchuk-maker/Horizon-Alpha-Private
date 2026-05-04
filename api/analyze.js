@@ -1,4 +1,4 @@
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   const apiKey = process.env.GROQ_API_KEY;
   const { word, tradition } = req.body;
 
