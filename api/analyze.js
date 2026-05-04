@@ -1,9 +1,13 @@
-export default async function handler(req, res) {
+const handler = async (req, res) => {
   const apiKey = process.env.GROQ_API_KEY;
-  const { word, tradition } = req.body;
+  const { word, tradition } = req.body || {};
 
   if (!apiKey) {
-    return res.status(200).json({ result: "SYSTEM ERROR: GROQ_API_KEY missing in Vercel." });
+    return res.status(200).json({ result: "SYSTEM ERROR: GROQ_API_KEY missing." });
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ result: "Method not allowed." });
   }
 
   try {
@@ -20,31 +24,27 @@ export default async function handler(req, res) {
         messages: [
           {
             role: "system",
-            content: `You are a veteran institutional market analyst with 20 years of forex and commodity trading experience. You think in Fibonacci retracements, COT positioning, liquidity engineering, and smart money concepts. You are NOT a financial advisor and give NO trade signals or recommendations. This is purely educational market structure analysis.
-
-Your analysis style:
-- Dense, precise institutional research desk prose
-- No fluff, no disclaimers mid-text
-- Think like a bank trader, not a retail educator
-- Reference specific Fibonacci levels (23.6%, 38.2%, 50%, 61.8%, 78.6%)
-- Reference COT data positioning concepts
-- Identify liquidity pools above highs and below lows
-- Note order blocks, fair value gaps, breaker blocks where relevant
-- For commodities: reference Baltic Dry Index, shipping data correlations
-- For crypto: reference on-chain data concepts, exchange flows
-- Always end with: "FOR EDUCATIONAL PURPOSES ONLY. NOT FINANCIAL ADVICE."`
+            content: "You are a veteran institutional market analyst with 20 years of forex and commodity trading experience. You think in Fibonacci retracements, COT positioning, liquidity engineering, and smart money concepts. You are NOT a financial advisor and give NO trade signals. This is purely educational market structure analysis. Write dense, precise institutional research prose. Reference Fibonacci levels (23.6%, 38.2%, 50%, 61.8%, 78.6%), COT positioning, liquidity pools, order blocks, fair value gaps. For commodities reference Baltic Dry Index. For crypto reference on-chain flows. Always end with: FOR EDUCATIONAL PURPOSES ONLY. NOT FINANCIAL ADVICE."
           },
           {
             role: "user",
-            content: `Asset: ${word}
-Intelligence Pillar: ${tradition || 'Full Market Briefing'}
+            content: `Asset: ${word || 'EUR/USD'}\nIntelligence Pillar: ${tradition || 'Full Market Briefing'}\n\nProvide a full institutional market structure briefing covering:\n1. FIBONACCI STRUCTURE\n2. COT POSITIONING\n3. LIQUIDITY ENGINEERING\n4. SMART MONEY CONCEPTS\n5. MACRO CONTEXT\n6. SHADOW LOGISTICS\n\nWrite 600-800 words of dense institutional analysis.`
+          }
+        ]
+      })
+    });
 
-Provide a full institutional market structure briefing covering:
+    const data = await response.json();
 
-1. FIBONACCI STRUCTURE — Key retracement levels on the major swing. Where is smart money likely defending or attacking? What is the 61.8% obligation level?
+    if (data.choices && data.choices[0] && data.choices[0].message) {
+      return res.status(200).json({ result: data.choices[0].message.content });
+    } else {
+      return res.status(200).json({ result: "DATA ERROR: " + JSON.stringify(data) });
+    }
 
-2. COT POSITIONING — What does Commitment of Traders data historically show for this asset at current structure? Are commercials accumulating or distributing?
+  } catch (err) {
+    return res.status(200).json({ result: "NETWORK ERROR: " + err.message });
+  }
+};
 
-3. LIQUIDITY ENGINEERING — Where are the stop clusters? Above what swing highs, below what swing lows? Where will institutions hunt liquidity before the real move?
-
-4. SMART MON
+module.exports = handler;
