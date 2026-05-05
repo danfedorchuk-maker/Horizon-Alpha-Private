@@ -111,59 +111,145 @@ Nearest Fib Resistance: ${current > fib500 ? fmt(fib382) : fmt(fib500)}
 
   let cotContext = "";
 
-  try {
-    // CFTC publishes COT data as a CSV — we fetch the most recent report
-    // Map assets to CFTC market names
-    const cotMap = {
-      "EUR/USD": "EURO FX",
-      "GBP/USD": "BRITISH POUND",
-      "USD/JPY": "JAPANESE YEN",
-      "USD/CHF": "SWISS FRANC",
-      "USD/CAD": "CANADIAN DOLLAR",
-      "AUD/USD": "AUSTRALIAN DOLLAR",
-      "NZD/USD": "NEW ZEALAND DOLLAR",
-      "XAU/USD": "GOLD",
-      "WTI CRUDE OIL": "CRUDE OIL",
-      "S&P 500 (SPX)": "S&P 500 STOCK INDEX",
-      "BTC/USD": "BITCOIN"
+  // Direct CFTC market name map (for majors and direct assets)
+  const cotMap = {
+    "EUR/USD": ["EURO FX"],
+    "GBP/USD": ["BRITISH POUND"],
+    "USD/JPY": ["JAPANESE YEN"],
+    "USD/CHF": ["SWISS FRANC"],
+    "USD/CAD": ["CANADIAN DOLLAR"],
+    "AUD/USD": ["AUSTRALIAN DOLLAR"],
+    "NZD/USD": ["NEW ZEALAND DOLLAR"],
+    "XAU/USD": ["GOLD"],
+    "WTI CRUDE OIL": ["CRUDE OIL"],
+    "S&P 500 (SPX)": ["S&P 500 STOCK INDEX"],
+    "BTC/USD": ["BITCOIN"],
+    // Cross pairs — fetch both component currencies
+    "GBP/JPY": ["BRITISH POUND", "JAPANESE YEN"],
+    "EUR/JPY": ["EURO FX", "JAPANESE YEN"],
+    "GBP/AUD": ["BRITISH POUND", "AUSTRALIAN DOLLAR"],
+    "EUR/GBP": ["EURO FX", "BRITISH POUND"],
+    "AUD/JPY": ["AUSTRALIAN DOLLAR", "JAPANESE YEN"],
+    "EUR/AUD": ["EURO FX", "AUSTRALIAN DOLLAR"],
+    "GBP/CHF": ["BRITISH POUND", "SWISS FRANC"],
+    "EUR/CHF": ["EURO FX", "SWISS FRANC"],
+    "CAD/JPY": ["CANADIAN DOLLAR", "JAPANESE YEN"],
+    "NZD/JPY": ["NEW ZEALAND DOLLAR", "JAPANESE YEN"],
+    "CHF/JPY": ["SWISS FRANC", "JAPANESE YEN"],
+    "GBP/CAD": ["BRITISH POUND", "CANADIAN DOLLAR"],
+    "EUR/CAD": ["EURO FX", "CANADIAN DOLLAR"],
+    "AUD/NZD": ["AUSTRALIAN DOLLAR", "NEW ZEALAND DOLLAR"],
+    "AUD/CAD": ["AUSTRALIAN DOLLAR", "CANADIAN DOLLAR"],
+    "GBP/NZD": ["BRITISH POUND", "NEW ZEALAND DOLLAR"],
+    "EUR/NZD": ["EURO FX", "NEW ZEALAND DOLLAR"],
+    "NZD/CAD": ["NEW ZEALAND DOLLAR", "CANADIAN DOLLAR"],
+    "NZD/CHF": ["NEW ZEALAND DOLLAR", "SWISS FRANC"],
+    "AUD/CHF": ["AUSTRALIAN DOLLAR", "SWISS FRANC"],
+    "CAD/CHF": ["CANADIAN DOLLAR", "SWISS FRANC"],
+  };
+
+  // Helper to parse one market from COT text
+  function parseCOT(cotText, marketName) {
+    const lines = cotText.split('\n');
+    const line  = lines.find(l => l.toUpperCase().includes(marketName.toUpperCase()));
+    if (!line) return null;
+    const f = line.split(',');
+    return {
+      name:        marketName,
+      reportDate:  f[2]  || 'N/A',
+      openInterest: parseInt(f[7])  || 0,
+      longComm:    parseInt(f[8])  || 0,
+      shortComm:   parseInt(f[9])  || 0,
+      longSpec:    parseInt(f[11]) || 0,
+      shortSpec:   parseInt(f[12]) || 0,
     };
+  }
 
-    const cotMarket = cotMap[asset];
+  function netBias(long, short) {
+    const net = long - short;
+    return `${net.toLocaleString()} (${net > 0 ? "NET LONG" : "NET SHORT"})`;
+  }
 
-    if (cotMarket) {
-      // CFTC Disaggregated COT report — legacy format, publicly available
-      const cotUrl = `https://www.cftc.gov/dea/newcot/f_disagg.txt`;
-      const cotRes  = await fetch(cotUrl, { 
+  try {
+    const markets = cotMap[asset];
+
+    if (markets) {
+      const cotUrl  = `https://www.cftc.gov/dea/newcot/f_disagg.txt`;
+      const cotRes  = await fetch(cotUrl, {
         headers: { 'User-Agent': 'Mozilla/5.0' },
         signal: AbortSignal.timeout(8000)
       });
       const cotText = await cotRes.text();
 
-      // Find the line for our market
-      const lines = cotText.split('\n');
-      const marketLine = lines.find(l => l.toUpperCase().includes(cotMarket));
-
-      if (marketLine) {
-        const fields = marketLine.split(',');
-        // COT fields: market, date, open interest, long, short, spreading, long%, short%...
-        const reportDate   = fields[2]  || 'N/A';
-        const openInterest = fields[7]  || 'N/A';
-        const longComm     = fields[8]  || 'N/A';
-        const shortComm    = fields[9]  || 'N/A';
-        const longSpec     = fields[11] || 'N/A';
-        const shortSpec    = fields[12] || 'N/A';
-
-        cotContext = `
-REAL COT DATA (Source: CFTC Disaggregated Report — ${reportDate})
-Market: ${cotMarket}
-Open Interest: ${parseInt(openInterest).toLocaleString()} contracts
-Commercial (Smart Money): Long ${parseInt(longComm).toLocaleString()} | Short ${parseInt(shortComm).toLocaleString()}
-Non-Commercial (Speculators): Long ${parseInt(longSpec).toLocaleString()} | Short ${parseInt(shortSpec).toLocaleString()}
-Commercial Net: ${(parseInt(longComm) - parseInt(shortComm)).toLocaleString()} (${parseInt(longComm) > parseInt(shortComm) ? "NET LONG — bullish bias" : "NET SHORT — bearish bias"})
-Speculator Net: ${(parseInt(longSpec) - parseInt(shortSpec)).toLocaleString()} (${parseInt(longSpec) > parseInt(shortSpec) ? "NET LONG" : "NET SHORT"})
+      if (markets.length === 1) {
+        // Direct market — single currency or commodity
+        const d = parseCOT(cotText, markets[0]);
+        if (d) {
+          cotContext = `
+REAL COT DATA (Source: CFTC Disaggregated Report — ${d.reportDate})
+Market: ${d.name}
+Open Interest: ${d.openInterest.toLocaleString()} contracts
+Commercial (Smart Money): Long ${d.longComm.toLocaleString()} | Short ${d.shortComm.toLocaleString()} | Net: ${netBias(d.longComm, d.shortComm)}
+Non-Commercial (Speculators): Long ${d.longSpec.toLocaleString()} | Short ${d.shortSpec.toLocaleString()} | Net: ${netBias(d.longSpec, d.shortSpec)}
 `;
+        } else {
+          cotContext = `COT data for ${markets[0]} not found in current CFTC report.`;
+        }
+
       } else {
-        cotContext = `COT data for ${asset} not found in current CFTC report. Provide general COT structural analysis based on known market dynamics.`;
+        // Cross pair — fetch both legs and infer combined bias
+        const base  = parseCOT(cotText, markets[0]); // e.g. BRITISH POUND for GBP/JPY
+        const quote = parseCOT(cotText, markets[1]); // e.g. JAPANESE YEN for GBP/JPY
+
+        if (base && quote) {
+          const baseCommNet  = base.longComm  - base.shortComm;
+          const quoteCommNet = quote.longComm - quote.shortComm;
+          const baseSpecNet  = base.longSpec  - base.shortSpec;
+          const quoteSpecNet = quote.longSpec - quote.shortSpec;
+
+          // For a cross pair X/Y: bullish if base is net long AND quote is net short
+          // Quote being net long on JPY = bearish for GBP/JPY (JPY strength)
+          const commBullish = baseCommNet > 0 && quoteCommNet < 0;
+          const commBearish = baseCommNet < 0 && quoteCommNet > 0;
+          const commMixed   = !commBullish && !commBearish;
+
+          const specBullish = baseSpecNet > 0 && quoteSpecNet < 0;
+          const specBearish = baseSpecNet < 0 && quoteSpecNet > 0;
+
+          const commSignal = commBullish ? "BULLISH CONFLUENCE — commercials long base, short quote"
+                           : commBearish ? "BEARISH CONFLUENCE — commercials short base, long quote"
+                           : "MIXED — no clear directional confluence";
+
+          const specSignal = specBullish ? "BULLISH — speculators net long base, net short quote"
+                           : specBearish ? "BEARISH — speculators net short base, net long quote"
+                           : "MIXED — conflicting speculator positioning";
+
+          const divergence = (commBullish && specBearish) || (commBearish && specBullish)
+                           ? "⚠ DIVERGENCE DETECTED: Smart money and speculators are positioned against each other — potential reversal or stop hunt setup."
+                           : "Smart money and speculators are aligned — trend continuation bias.";
+
+          cotContext = `
+REAL COT DATA — CROSS PAIR INFERENCE (Source: CFTC Disaggregated Report — ${base.reportDate})
+Cross: ${asset} | Derived from: ${markets[0]} + ${markets[1]}
+
+BASE LEG — ${markets[0]}:
+  Open Interest: ${base.openInterest.toLocaleString()} contracts
+  Commercial (Smart Money): Long ${base.longComm.toLocaleString()} | Short ${base.shortComm.toLocaleString()} | Net: ${netBias(base.longComm, base.shortComm)}
+  Non-Commercial (Speculators): Long ${base.longSpec.toLocaleString()} | Short ${base.shortSpec.toLocaleString()} | Net: ${netBias(base.longSpec, base.shortSpec)}
+
+QUOTE LEG — ${markets[1]}:
+  Open Interest: ${quote.openInterest.toLocaleString()} contracts
+  Commercial (Smart Money): Long ${quote.longComm.toLocaleString()} | Short ${quote.shortComm.toLocaleString()} | Net: ${netBias(quote.longComm, quote.shortComm)}
+  Non-Commercial (Speculators): Long ${quote.longSpec.toLocaleString()} | Short ${quote.shortSpec.toLocaleString()} | Net: ${netBias(quote.longSpec, quote.shortSpec)}
+
+CROSS PAIR COT INFERENCE:
+  Commercial Signal: ${commSignal}
+  Speculator Signal: ${specSignal}
+  ${divergence}
+`;
+        } else {
+          cotContext = `COT data incomplete for ${asset} cross pair components. Base: ${base ? 'found' : 'missing'}, Quote: ${quote ? 'found' : 'missing'}.`;
+        }
       }
     } else {
       cotContext = `COT data not tracked by CFTC for ${asset}. Analyze institutional positioning based on cross-market flows and price action.`;
