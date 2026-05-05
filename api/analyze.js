@@ -124,25 +124,80 @@ Nearest Support: ${current > fib500 ? fmt(fib500) : fmt(fib618)} | Nearest Resis
     return `${n > 0 ? '+' : ''}${n.toLocaleString()} (${n > 0 ? 'NET LONG' : 'NET SHORT'})`;
   }
 
-  // Fetch latest COT data from CFTC CSV download (confirmed working URL)
-  // CSV columns: ID, Market_and_Exchange_Names, Report_Date_as_YYYY_MM_DD, YYYY Report Week WW,
-  // CONTRACT_MARKET_NAME, CFTC_Contract_Market_Code, CFTC_Market_Code, CFTC_Region_Code,
-  // CFTC_Commodity_Code, Commodity Name, Open_Interest_All, NonComm_Positions_Long_All,
-  // NonComm_Positions_Short_All, NonComm_Postions_Spread_All, Comm_Positions_Long_All,
-  // Comm_Positions_Short_All, ...
-  let _cotCache = null;
-  async function getCOTData() {
-    if (_cotCache) return _cotCache;
-    const url = "https://publicreporting.cftc.gov/api/views/6dca-aqww/rows.csv?accessType=DOWNLOAD&bom=true&format=true";
+  // Build URL for most recent CFTC viewable report
+  // Format: https://www.cftc.gov/MarketReports/CommitmentsofTraders/HistoricalViewable/cot{MMDDYY}
+  function getMostRecentCOTUrl() {
+    const now = new Date();
+    // COT reports come out Friday, data from prior Tuesday
+    // Find last Friday
+    const day = now.getDay(); // 0=Sun, 5=Fri
+    const daysBack = day >= 5 ? day - 5 : day + 2;
+    const friday = new Date(now);
+    friday.setDate(now.getDate() - daysBack);
+    // If today is before Friday 3:30 PM ET, go back one more week
+    const mm = String(friday.getMonth() + 1).padStart(2, '0');
+    const dd = String(friday.getDate()).padStart(2, '0');
+    const yy = String(friday.getFullYear()).slice(2);
+    return `https://www.cftc.gov/MarketReports/CommitmentsofTraders/HistoricalViewable/cot${mm}${dd}${yy}`;
+  }
+
+  // Parse the HTML viewable report — it's a preformatted text report
+  // Numbers appear as space-padded columns in a fixed-width format
+  function parseHTMLReport(html, keyword) {
+    // Strip HTML tags to get the text
+    const text = html.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ');
+    const kw = keyword.toUpperCase();
+    const idx = text.toUpperCase().indexOf(kw);
+    if (idx === -1) return null;
+
+    // Get the section of text around and after the keyword
+    const section = text.slice(idx, idx + 2000);
+
+    // Extract numbers — the report format has:
+    // Open Interest, then NonComm Long, Short, Spreading, Comm Long, Short
+    // We look for sequences of large numbers (contract counts in thousands)
+    const nums = [];
+    const numRe = /\b(\d{1,3}(?:,\d{3})+|\d{4,})\b/g;
+    let m;
+    while ((m = numRe.exec(section)) !== null && nums.length < 15) {
+      nums.push(parseInt(m[1].replace(/,/g, '')));
+    }
+
+    if (nums.length < 6) return null;
+
+    // Find the report date near the keyword
+    const dateMatch = section.match(/(\w+ \d+, \d{4})/);
+    const reportDate = dateMatch ? dateMatch[1] : 'N/A';
+
+    return {
+      name:         keyword,
+      reportDate,
+      openInterest: nums[0] || 0,
+      longSpec:     nums[1] || 0,
+      shortSpec:    nums[2] || 0,
+      longComm:     nums[4] || 0,
+      shortComm:    nums[5] || 0,
+    };
+  }
+
+  let _cotHtml = null;
+  async function getCOTHtml() {
+    if (_cotHtml) return _cotHtml;
+    const url = getMostRecentCOTUrl();
     const res = await fetch(url, {
       headers: { 'User-Agent': 'Mozilla/5.0' },
-      signal: AbortSignal.timeout(15000)
+      signal: AbortSignal.timeout(10000)
     });
-    if (!res.ok) throw new Error(`CFTC CSV ${res.status}`);
-    const text = await res.text();
-    if (text.length < 500) throw new Error("CFTC CSV too short");
-    _cotCache = text;
-    return text;
+    if (!res.ok) throw new Error(`CFTC report ${res.status} at ${url}`);
+    const html = await res.text();
+    if (html.length < 1000) throw new Error("CFTC report too short");
+    _cotHtml = html;
+    return html;
+  }
+
+  async function fetchCOT(keyword) {
+    const html = await getCOTHtml();
+    return parseHTMLReport(html, keyword);
   }
 
   function parseCOTCsv(csvText, keyword) {
