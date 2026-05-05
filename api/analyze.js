@@ -119,59 +119,90 @@ Nearest Support: ${current > fib500 ? fmt(fib500) : fmt(fib618)} | Nearest Resis
     "CAD/CHF":  ["CANADIAN DOLLAR", "SWISS FRANC"],
   };
 
-  // Legacy COT columns (f_leg.txt):
-  // 0=market_name, 1=exchange, 2=cftc_code, 3=report_date
-  // 4=open_interest, 5=noncomm_long, 6=noncomm_short, 7=noncomm_spread
-  // 8=comm_long, 9=comm_short, 10=total_long, 11=total_short
-  function parseCOT(cotText, keyword) {
-    const lines = cotText.split('\n');
-    const kw = keyword.toLowerCase();
-    const line = lines.find(l => l.toLowerCase().includes(kw));
-    if (!line) return null;
-    const f = line.split(',').map(s => s.replace(/"/g, '').trim());
-    if (f.length < 10) return null;
-    return {
-      name:         f[0],
-      reportDate:   f[3] || 'N/A',
-      openInterest: parseInt(f[4])  || 0,
-      longSpec:     parseInt(f[5])  || 0,
-      shortSpec:    parseInt(f[6])  || 0,
-      longComm:     parseInt(f[8])  || 0,
-      shortComm:    parseInt(f[9])  || 0,
-    };
-  }
-
   function net(long, short) {
     const n = long - short;
     return `${n > 0 ? '+' : ''}${n.toLocaleString()} (${n > 0 ? 'NET LONG' : 'NET SHORT'})`;
   }
 
+  // Fetch latest COT data from CFTC CSV download (confirmed working URL)
+  // CSV columns: ID, Market_and_Exchange_Names, Report_Date_as_YYYY_MM_DD, YYYY Report Week WW,
+  // CONTRACT_MARKET_NAME, CFTC_Contract_Market_Code, CFTC_Market_Code, CFTC_Region_Code,
+  // CFTC_Commodity_Code, Commodity Name, Open_Interest_All, NonComm_Positions_Long_All,
+  // NonComm_Positions_Short_All, NonComm_Postions_Spread_All, Comm_Positions_Long_All,
+  // Comm_Positions_Short_All, ...
+  let _cotCache = null;
+  async function getCOTData() {
+    if (_cotCache) return _cotCache;
+    const url = "https://publicreporting.cftc.gov/api/views/6dca-aqww/rows.csv?accessType=DOWNLOAD&bom=true&format=true";
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(15000)
+    });
+    if (!res.ok) throw new Error(`CFTC CSV ${res.status}`);
+    const text = await res.text();
+    if (text.length < 500) throw new Error("CFTC CSV too short");
+    _cotCache = text;
+    return text;
+  }
+
+  function parseCOTCsv(csvText, keyword) {
+    const lines = csvText.split('\n');
+    const header = lines[0].split(',').map(h => h.replace(/"/g,'').trim().toLowerCase());
+    const kw = keyword.toLowerCase();
+
+    // Find all lines matching this keyword, then pick the most recent
+    const matching = lines.slice(1).filter(l => l.toLowerCase().includes(kw));
+    if (matching.length === 0) return null;
+
+    // Sort by date descending — date is in column 2 (Report_Date_as_YYYY_MM_DD)
+    matching.sort((a, b) => {
+      const da = a.split(',')[2]?.replace(/"/g,'') || '';
+      const db = b.split(',')[2]?.replace(/"/g,'') || '';
+      return db.localeCompare(da);
+    });
+
+    const f = matching[0].split(',').map(s => s.replace(/"/g,'').trim());
+
+    // Column indices from header:
+    // 1=Market_and_Exchange_Names, 2=Report_Date, 10=Open_Interest_All
+    // 11=NonComm_Long_All, 12=NonComm_Short_All, 14=Comm_Long_All, 15=Comm_Short_All
+    return {
+      name:         f[1]  || keyword,
+      reportDate:   f[2]  || 'N/A',
+      openInterest: parseInt(f[10]) || 0,
+      longSpec:     parseInt(f[11]) || 0,
+      shortSpec:    parseInt(f[12]) || 0,
+      longComm:     parseInt(f[14]) || 0,
+      shortComm:    parseInt(f[15]) || 0,
+    };
+  }
+
+  async function fetchCOT(keyword) {
+    const csvText = await getCOTData();
+    return parseCOTCsv(csvText, keyword);
+  }
+
   try {
     const markets = cotMap[asset];
     if (markets) {
-      const cotRes = await fetch("https://www.cftc.gov/dea/newcot/f_leg.txt", {
-        headers: { 'User-Agent': 'Mozilla/5.0' },
-        signal: AbortSignal.timeout(12000)
-      });
-      if (!cotRes.ok) throw new Error(`CFTC HTTP ${cotRes.status}`);
-      const cotText = await cotRes.text();
-      if (cotText.length < 500) throw new Error("CFTC response too short");
-
       if (markets.length === 1) {
-        const d = parseCOT(cotText, markets[0]);
+        const d = await fetchCOT(markets[0]);
         if (d) {
           cotContext = `
-REAL COT DATA (CFTC Legacy Report — ${d.reportDate})
+REAL COT DATA (CFTC Legacy Futures Only — ${d.reportDate})
 Market: ${d.name}
 Open Interest: ${d.openInterest.toLocaleString()} contracts
 Commercial (Smart Money): Long ${d.longComm.toLocaleString()} | Short ${d.shortComm.toLocaleString()} | Net: ${net(d.longComm, d.shortComm)}
 Non-Commercial (Speculators): Long ${d.longSpec.toLocaleString()} | Short ${d.shortSpec.toLocaleString()} | Net: ${net(d.longSpec, d.shortSpec)}`;
         } else {
-          cotContext = `COT data for ${markets[0]} not found in CFTC report. Provide general institutional analysis.`;
+          cotContext = `COT data for ${markets[0]} not found in CFTC database. Provide general institutional analysis.`;
         }
       } else {
-        const base  = parseCOT(cotText, markets[0]);
-        const quote = parseCOT(cotText, markets[1]);
+        // Cross pair — fetch both legs in parallel
+        const [base, quote] = await Promise.all([
+          fetchCOT(markets[0]),
+          fetchCOT(markets[1])
+        ]);
 
         if (base && quote) {
           const bcn = base.longComm  - base.shortComm;
@@ -186,16 +217,16 @@ Non-Commercial (Speculators): Long ${d.longSpec.toLocaleString()} | Short ${d.sh
 
           const commSig = commBull ? "BULLISH CONFLUENCE — commercials long base, short quote"
                         : commBear ? "BEARISH CONFLUENCE — commercials short base, long quote"
-                        : "MIXED — no directional confluence";
+                        : "MIXED — no clear directional confluence";
           const specSig = specBull ? "BULLISH — speculators net long base, net short quote"
                         : specBear ? "BEARISH — speculators net short base, net long quote"
                         : "MIXED — conflicting speculator positioning";
           const div = (commBull && specBear) || (commBear && specBull)
-                    ? "⚠ DIVERGENCE: Smart money vs speculators on opposite sides — high probability stop hunt or reversal."
+                    ? "⚠ DIVERGENCE: Smart money vs speculators on opposite sides — high probability stop hunt or reversal setup."
                     : "Smart money and speculators aligned — trend continuation bias.";
 
           cotContext = `
-REAL COT DATA — CROSS PAIR INFERENCE (CFTC Legacy Report — ${base.reportDate})
+REAL COT DATA — CROSS PAIR INFERENCE (CFTC Legacy Futures Only — ${base.reportDate})
 Cross: ${asset} | Derived from: ${markets[0]} + ${markets[1]}
 
 BASE (${markets[0]}):
@@ -209,11 +240,11 @@ CROSS INFERENCE:
   Speculator Signal: ${specSig}
   ${div}`;
         } else {
-          cotContext = `Cross COT inference: ${markets[0]}: ${base ? 'found' : 'missing'}, ${markets[1]}: ${quote ? 'found' : 'missing'}. Provide general institutional analysis.`;
+          cotContext = `Cross COT: ${markets[0]}: ${base ? 'found' : 'missing'}, ${markets[1]}: ${quote ? 'found' : 'missing'}. Provide general institutional positioning analysis.`;
         }
       }
     } else {
-      cotContext = `CFTC does not publish COT data for ${asset}. Analyze via cross-market flows.`;
+      cotContext = `CFTC does not publish COT data for ${asset}. Analyze via cross-market flows and price action.`;
     }
   } catch (err) {
     cotContext = `COT fetch failed (${err.message}). Provide general institutional positioning analysis for ${asset} based on known market dynamics.`;
