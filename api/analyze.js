@@ -124,80 +124,84 @@ Nearest Support: ${current > fib500 ? fmt(fib500) : fmt(fib618)} | Nearest Resis
     return `${n > 0 ? '+' : ''}${n.toLocaleString()} (${n > 0 ? 'NET LONG' : 'NET SHORT'})`;
   }
 
-  // Build URL for most recent CFTC viewable report
-  // Format: https://www.cftc.gov/MarketReports/CommitmentsofTraders/HistoricalViewable/cot{MMDDYY}
-  function getMostRecentCOTUrl() {
+  // Build the correct CME short format URL for the most recent Friday
+  function getCMEShortUrl() {
     const now = new Date();
-    // COT reports come out Friday, data from prior Tuesday
-    // Find last Friday
     const day = now.getDay(); // 0=Sun, 5=Fri
     const daysBack = day >= 5 ? day - 5 : day + 2;
     const friday = new Date(now);
     friday.setDate(now.getDate() - daysBack);
-    // If today is before Friday 3:30 PM ET, go back one more week
     const mm = String(friday.getMonth() + 1).padStart(2, '0');
     const dd = String(friday.getDate()).padStart(2, '0');
     const yy = String(friday.getFullYear()).slice(2);
-    return `https://www.cftc.gov/MarketReports/CommitmentsofTraders/HistoricalViewable/cot${mm}${dd}${yy}`;
+    return `https://www.cftc.gov/files/dea/cotarchives/${friday.getFullYear()}/futures/deacmesf${mm}${dd}${yy}.htm`;
   }
 
-  // Parse the HTML viewable report — it's a preformatted text report
-  // Numbers appear as space-padded columns in a fixed-width format
-  function parseHTMLReport(html, keyword) {
-    // Strip HTML tags to get the text
-    const text = html.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ');
+  // Parse the fixed-width CME short format report
+  // Format per market:
+  // NAME - CHICAGO MERCANTILE EXCHANGE   Code-XXXXXX
+  // FUTURES ONLY POSITIONS AS OF MM/DD/YY
+  // LONG  | SHORT  |SPREADS |  LONG  | SHORT  ...
+  // (contract size)   OPEN INTEREST: NNN
+  // COMMITMENTS
+  // NonCommLong  NonCommShort  Spreading  CommLong  CommShort  ...
+  function parseCMEReport(text, keyword) {
     const kw = keyword.toUpperCase();
     const idx = text.toUpperCase().indexOf(kw);
     if (idx === -1) return null;
 
-    // Get the section of text around and after the keyword
-    const section = text.slice(idx, idx + 2000);
+    // Get section from keyword forward
+    const section = text.slice(idx, idx + 1500);
 
-    // Extract numbers — the report format has:
-    // Open Interest, then NonComm Long, Short, Spreading, Comm Long, Short
-    // We look for sequences of large numbers (contract counts in thousands)
-    const nums = [];
-    const numRe = /\b(\d{1,3}(?:,\d{3})+|\d{4,})\b/g;
-    let m;
-    while ((m = numRe.exec(section)) !== null && nums.length < 15) {
-      nums.push(parseInt(m[1].replace(/,/g, '')));
-    }
-
-    if (nums.length < 6) return null;
-
-    // Find the report date near the keyword
-    const dateMatch = section.match(/(\w+ \d+, \d{4})/);
+    // Find the date
+    const dateMatch = section.match(/AS OF\s+(\d{2}\/\d{2}\/\d{2})/i);
     const reportDate = dateMatch ? dateMatch[1] : 'N/A';
+
+    // Find OPEN INTEREST value
+    const oiMatch = section.match(/OPEN INTEREST:\s*([\d,]+)/i);
+    const openInterest = oiMatch ? parseInt(oiMatch[1].replace(/,/g,'')) : 0;
+
+    // Find COMMITMENTS line — the numbers on the very next line
+    const commIdx = section.indexOf('COMMITMENTS');
+    if (commIdx === -1) return null;
+
+    const afterComm = section.slice(commIdx + 11).trim();
+    // Extract first line of numbers
+    const firstLine = afterComm.split('\n')[0];
+    const nums = firstLine.match(/[\d,]+/g);
+    if (!nums || nums.length < 5) return null;
+
+    const parsed = nums.map(n => parseInt(n.replace(/,/g,'')));
 
     return {
       name:         keyword,
       reportDate,
-      openInterest: nums[0] || 0,
-      longSpec:     nums[1] || 0,
-      shortSpec:    nums[2] || 0,
-      longComm:     nums[4] || 0,
-      shortComm:    nums[5] || 0,
+      openInterest,
+      longSpec:     parsed[0] || 0,  // NonComm Long
+      shortSpec:    parsed[1] || 0,  // NonComm Short
+      longComm:     parsed[3] || 0,  // Comm Long
+      shortComm:    parsed[4] || 0,  // Comm Short
     };
   }
 
-  let _cotHtml = null;
-  async function getCOTHtml() {
-    if (_cotHtml) return _cotHtml;
-    const url = getMostRecentCOTUrl();
+  let _cotText = null;
+  async function getCOTText() {
+    if (_cotText) return _cotText;
+    const url = getCMEShortUrl();
     const res = await fetch(url, {
       headers: { 'User-Agent': 'Mozilla/5.0' },
       signal: AbortSignal.timeout(10000)
     });
-    if (!res.ok) throw new Error(`CFTC report ${res.status} at ${url}`);
+    if (!res.ok) throw new Error(`CFTC ${res.status} — ${url}`);
     const html = await res.text();
-    if (html.length < 1000) throw new Error("CFTC report too short");
-    _cotHtml = html;
-    return html;
+    // Strip HTML tags
+    _cotText = html.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s{2,}/g, ' ');
+    return _cotText;
   }
 
   async function fetchCOT(keyword) {
-    const html = await getCOTHtml();
-    return parseHTMLReport(html, keyword);
+    const text = await getCOTText();
+    return parseCMEReport(text, keyword);
   }
 
   function parseCOTCsv(csvText, keyword) {
