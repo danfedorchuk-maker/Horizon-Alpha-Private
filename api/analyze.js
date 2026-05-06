@@ -1,5 +1,6 @@
 // api/analyze.js — Horizon Alpha Private
-// Real price data from Twelve Data + Real COT from CFTC + Groq analysis
+// Real Fibonacci from Twelve Data + Real COT hardcoded from CFTC (updated Fridays)
+// COT data last updated: April 21, 2026
 
 const handler = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ result: "Method not allowed." });
@@ -80,233 +81,133 @@ Nearest Support: ${current > fib500 ? fmt(fib500) : fmt(fib618)} | Nearest Resis
     fibContext   = `Fibonacci unavailable.`;
   }
 
-  // ── 2. REAL COT DATA FROM CFTC ────────────────────────────────────────────────
+  // ── 2. COT DATA — hardcoded from CFTC CME report April 21, 2026 ──────────────
+  // Source: https://www.cftc.gov/files/dea/cotarchives/2026/futures/deacmesf042126.htm
+  // UPDATE THIS EVERY FRIDAY after 3:30 PM ET when CFTC releases new data
+  // Format: { oi, longSpec, shortSpec, longComm, shortComm }
+
+  const COT_REPORT_DATE = "April 21, 2026";
+  const COT_DATA = {
+    "BRITISH POUND":      { oi: 263523,  longSpec: 63086,  shortSpec: 115125, longComm: 172752, shortComm: 115913 },
+    "JAPANESE YEN":       { oi: 351782,  longSpec: 101386, shortSpec: 195846, longComm: 188723, shortComm: 93256  },
+    "EURO FX":            { oi: 790622,  longSpec: 217407, shortSpec: 176083, longComm: 459844, shortComm: 543507 },
+    "SWISS FRANC":        { oi: 91532,   longSpec: 8372,   shortSpec: 41645,  longComm: 71762,  shortComm: 29507  },
+    "CANADIAN DOLLAR":    { oi: 255128,  longSpec: 60889,  shortSpec: 119723, longComm: 158814, shortComm: 99593  },
+    "AUSTRALIAN DOLLAR":  { oi: 275415,  longSpec: 128811, shortSpec: 63994,  longComm: 100168, shortComm: 193366 },
+    "NEW ZEALAND DOLLAR": { oi: 82508,   longSpec: 7917,   shortSpec: 56371,  longComm: 70056,  shortComm: 21073  },
+    "GOLD":               { oi: 0,       longSpec: 0,      shortSpec: 0,      longComm: 0,      shortComm: 0      },
+    "CRUDE OIL":          { oi: 0,       longSpec: 0,      shortSpec: 0,      longComm: 0,      shortComm: 0      },
+    "S&P 500":            { oi: 1985777, longSpec: 230168, shortSpec: 340125, longComm: 1448688,shortComm: 1425930},
+    "BITCOIN":            { oi: 24994,   longSpec: 17097,  shortSpec: 15026,  longComm: 194,    shortComm: 2444   },
+    "NASDAQ":             { oi: 290216,  longSpec: 68265,  shortSpec: 61653,  longComm: 147270, shortComm: 158570 },
+    "RUSSELL":            { oi: 411435,  longSpec: 85212,  shortSpec: 101109, longComm: 294270, shortComm: 282089 },
+  };
+
+  // Map assets to COT_DATA keys
+  const cotMap = {
+    "EUR/USD":          ["EURO FX"],
+    "GBP/USD":          ["BRITISH POUND"],
+    "USD/JPY":          ["JAPANESE YEN"],
+    "USD/CHF":          ["SWISS FRANC"],
+    "USD/CAD":          ["CANADIAN DOLLAR"],
+    "AUD/USD":          ["AUSTRALIAN DOLLAR"],
+    "NZD/USD":          ["NEW ZEALAND DOLLAR"],
+    "XAU/USD":          ["GOLD"],
+    "WTI CRUDE OIL":    ["CRUDE OIL"],
+    "S&P 500 (SPX)":    ["S&P 500"],
+    "NASDAQ 100 (NDX)": ["NASDAQ"],
+    "RUSSELL 2000 (RUT)":["RUSSELL"],
+    "BTC/USD":          ["BITCOIN"],
+    "GBP/JPY":  ["BRITISH POUND", "JAPANESE YEN"],
+    "EUR/JPY":  ["EURO FX",       "JAPANESE YEN"],
+    "GBP/AUD":  ["BRITISH POUND", "AUSTRALIAN DOLLAR"],
+    "EUR/GBP":  ["EURO FX",       "BRITISH POUND"],
+    "AUD/JPY":  ["AUSTRALIAN DOLLAR", "JAPANESE YEN"],
+    "EUR/AUD":  ["EURO FX",       "AUSTRALIAN DOLLAR"],
+    "GBP/CHF":  ["BRITISH POUND", "SWISS FRANC"],
+    "EUR/CHF":  ["EURO FX",       "SWISS FRANC"],
+    "CAD/JPY":  ["CANADIAN DOLLAR","JAPANESE YEN"],
+    "NZD/JPY":  ["NEW ZEALAND DOLLAR","JAPANESE YEN"],
+    "CHF/JPY":  ["SWISS FRANC",   "JAPANESE YEN"],
+    "GBP/CAD":  ["BRITISH POUND", "CANADIAN DOLLAR"],
+    "EUR/CAD":  ["EURO FX",       "CANADIAN DOLLAR"],
+    "AUD/NZD":  ["AUSTRALIAN DOLLAR","NEW ZEALAND DOLLAR"],
+    "AUD/CAD":  ["AUSTRALIAN DOLLAR","CANADIAN DOLLAR"],
+    "GBP/NZD":  ["BRITISH POUND", "NEW ZEALAND DOLLAR"],
+    "EUR/NZD":  ["EURO FX",       "NEW ZEALAND DOLLAR"],
+    "NZD/CAD":  ["NEW ZEALAND DOLLAR","CANADIAN DOLLAR"],
+    "NZD/CHF":  ["NEW ZEALAND DOLLAR","SWISS FRANC"],
+    "AUD/CHF":  ["AUSTRALIAN DOLLAR","SWISS FRANC"],
+    "CAD/CHF":  ["CANADIAN DOLLAR","SWISS FRANC"],
+  };
 
   let cotContext = "";
-
-  const cotMap = {
-    "EUR/USD":       ["EURO FX"],
-    "GBP/USD":       ["BRITISH POUND"],
-    "USD/JPY":       ["JAPANESE YEN"],
-    "USD/CHF":       ["SWISS FRANC"],
-    "USD/CAD":       ["CANADIAN DOLLAR"],
-    "AUD/USD":       ["AUSTRALIAN DOLLAR"],
-    "NZD/USD":       ["NEW ZEALAND DOLLAR"],
-    "XAU/USD":       ["GOLD"],
-    "WTI CRUDE OIL": ["CRUDE OIL"],
-    "S&P 500 (SPX)": ["S&P 500"],
-    "BTC/USD":       ["BITCOIN"],
-    "GBP/JPY":  ["BRITISH POUND", "JAPANESE YEN"],
-    "EUR/JPY":  ["EURO FX", "JAPANESE YEN"],
-    "GBP/AUD":  ["BRITISH POUND", "AUSTRALIAN DOLLAR"],
-    "EUR/GBP":  ["EURO FX", "BRITISH POUND"],
-    "AUD/JPY":  ["AUSTRALIAN DOLLAR", "JAPANESE YEN"],
-    "EUR/AUD":  ["EURO FX", "AUSTRALIAN DOLLAR"],
-    "GBP/CHF":  ["BRITISH POUND", "SWISS FRANC"],
-    "EUR/CHF":  ["EURO FX", "SWISS FRANC"],
-    "CAD/JPY":  ["CANADIAN DOLLAR", "JAPANESE YEN"],
-    "NZD/JPY":  ["NEW ZEALAND DOLLAR", "JAPANESE YEN"],
-    "CHF/JPY":  ["SWISS FRANC", "JAPANESE YEN"],
-    "GBP/CAD":  ["BRITISH POUND", "CANADIAN DOLLAR"],
-    "EUR/CAD":  ["EURO FX", "CANADIAN DOLLAR"],
-    "AUD/NZD":  ["AUSTRALIAN DOLLAR", "NEW ZEALAND DOLLAR"],
-    "AUD/CAD":  ["AUSTRALIAN DOLLAR", "CANADIAN DOLLAR"],
-    "GBP/NZD":  ["BRITISH POUND", "NEW ZEALAND DOLLAR"],
-    "EUR/NZD":  ["EURO FX", "NEW ZEALAND DOLLAR"],
-    "NZD/CAD":  ["NEW ZEALAND DOLLAR", "CANADIAN DOLLAR"],
-    "NZD/CHF":  ["NEW ZEALAND DOLLAR", "SWISS FRANC"],
-    "AUD/CHF":  ["AUSTRALIAN DOLLAR", "SWISS FRANC"],
-    "CAD/CHF":  ["CANADIAN DOLLAR", "SWISS FRANC"],
-  };
 
   function net(long, short) {
     const n = long - short;
     return `${n > 0 ? '+' : ''}${n.toLocaleString()} (${n > 0 ? 'NET LONG' : 'NET SHORT'})`;
   }
 
-  // Build the correct CME short format URL for the most recent Friday
-  function getCMEShortUrl() {
-    const now = new Date();
-    const day = now.getDay(); // 0=Sun, 5=Fri
-    const daysBack = day >= 5 ? day - 5 : day + 2;
-    const friday = new Date(now);
-    friday.setDate(now.getDate() - daysBack);
-    const mm = String(friday.getMonth() + 1).padStart(2, '0');
-    const dd = String(friday.getDate()).padStart(2, '0');
-    const yy = String(friday.getFullYear()).slice(2);
-    return `https://www.cftc.gov/files/dea/cotarchives/${friday.getFullYear()}/futures/deacmesf${mm}${dd}${yy}.htm`;
-  }
-
-  // Parse the fixed-width CME short format report
-  // Format per market:
-  // NAME - CHICAGO MERCANTILE EXCHANGE   Code-XXXXXX
-  // FUTURES ONLY POSITIONS AS OF MM/DD/YY
-  // LONG  | SHORT  |SPREADS |  LONG  | SHORT  ...
-  // (contract size)   OPEN INTEREST: NNN
-  // COMMITMENTS
-  // NonCommLong  NonCommShort  Spreading  CommLong  CommShort  ...
-  function parseCMEReport(text, keyword) {
-    const kw = keyword.toUpperCase();
-    const idx = text.toUpperCase().indexOf(kw);
-    if (idx === -1) return null;
-
-    // Get section from keyword forward
-    const section = text.slice(idx, idx + 1500);
-
-    // Find the date
-    const dateMatch = section.match(/AS OF\s+(\d{2}\/\d{2}\/\d{2})/i);
-    const reportDate = dateMatch ? dateMatch[1] : 'N/A';
-
-    // Find OPEN INTEREST value
-    const oiMatch = section.match(/OPEN INTEREST:\s*([\d,]+)/i);
-    const openInterest = oiMatch ? parseInt(oiMatch[1].replace(/,/g,'')) : 0;
-
-    // Find COMMITMENTS line — the numbers on the very next line
-    const commIdx = section.indexOf('COMMITMENTS');
-    if (commIdx === -1) return null;
-
-    const afterComm = section.slice(commIdx + 11).trim();
-    // Extract first line of numbers
-    const firstLine = afterComm.split('\n')[0];
-    const nums = firstLine.match(/[\d,]+/g);
-    if (!nums || nums.length < 5) return null;
-
-    const parsed = nums.map(n => parseInt(n.replace(/,/g,'')));
-
-    return {
-      name:         keyword,
-      reportDate,
-      openInterest,
-      longSpec:     parsed[0] || 0,  // NonComm Long
-      shortSpec:    parsed[1] || 0,  // NonComm Short
-      longComm:     parsed[3] || 0,  // Comm Long
-      shortComm:    parsed[4] || 0,  // Comm Short
-    };
-  }
-
-  let _cotText = null;
-  async function getCOTText() {
-    if (_cotText) return _cotText;
-    const url = getCMEShortUrl();
-    const res = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0' },
-      signal: AbortSignal.timeout(10000)
-    });
-    if (!res.ok) throw new Error(`CFTC ${res.status} — ${url}`);
-    const html = await res.text();
-    // Strip HTML tags
-    _cotText = html.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s{2,}/g, ' ');
-    return _cotText;
-  }
-
-  async function fetchCOT(keyword) {
-    const text = await getCOTText();
-    return parseCMEReport(text, keyword);
-  }
-
-  function parseCOTCsv(csvText, keyword) {
-    const lines = csvText.split('\n');
-    const header = lines[0].split(',').map(h => h.replace(/"/g,'').trim().toLowerCase());
-    const kw = keyword.toLowerCase();
-
-    // Find all lines matching this keyword, then pick the most recent
-    const matching = lines.slice(1).filter(l => l.toLowerCase().includes(kw));
-    if (matching.length === 0) return null;
-
-    // Sort by date descending — date is in column 2 (Report_Date_as_YYYY_MM_DD)
-    matching.sort((a, b) => {
-      const da = a.split(',')[2]?.replace(/"/g,'') || '';
-      const db = b.split(',')[2]?.replace(/"/g,'') || '';
-      return db.localeCompare(da);
-    });
-
-    const f = matching[0].split(',').map(s => s.replace(/"/g,'').trim());
-
-    // Column indices from header:
-    // 1=Market_and_Exchange_Names, 2=Report_Date, 10=Open_Interest_All
-    // 11=NonComm_Long_All, 12=NonComm_Short_All, 14=Comm_Long_All, 15=Comm_Short_All
-    return {
-      name:         f[1]  || keyword,
-      reportDate:   f[2]  || 'N/A',
-      openInterest: parseInt(f[10]) || 0,
-      longSpec:     parseInt(f[11]) || 0,
-      shortSpec:    parseInt(f[12]) || 0,
-      longComm:     parseInt(f[14]) || 0,
-      shortComm:    parseInt(f[15]) || 0,
-    };
-  }
-
-  async function fetchCOT(keyword) {
-    const csvText = await getCOTData();
-    return parseCOTCsv(csvText, keyword);
-  }
-
-  try {
-    const markets = cotMap[asset];
-    if (markets) {
-      if (markets.length === 1) {
-        const d = await fetchCOT(markets[0]);
-        if (d) {
-          cotContext = `
-REAL COT DATA (CFTC Legacy Futures Only — ${d.reportDate})
-Market: ${d.name}
-Open Interest: ${d.openInterest.toLocaleString()} contracts
+  const markets = cotMap[asset];
+  if (markets) {
+    if (markets.length === 1) {
+      const d = COT_DATA[markets[0]];
+      if (d && d.oi > 0) {
+        cotContext = `
+REAL COT DATA (CFTC CME Futures Only — ${COT_REPORT_DATE})
+Market: ${markets[0]}
+Open Interest: ${d.oi.toLocaleString()} contracts
 Commercial (Smart Money): Long ${d.longComm.toLocaleString()} | Short ${d.shortComm.toLocaleString()} | Net: ${net(d.longComm, d.shortComm)}
 Non-Commercial (Speculators): Long ${d.longSpec.toLocaleString()} | Short ${d.shortSpec.toLocaleString()} | Net: ${net(d.longSpec, d.shortSpec)}`;
-        } else {
-          cotContext = `COT data for ${markets[0]} not found in CFTC database. Provide general institutional analysis.`;
-        }
       } else {
-        // Cross pair — fetch both legs in parallel
-        const [base, quote] = await Promise.all([
-          fetchCOT(markets[0]),
-          fetchCOT(markets[1])
-        ]);
+        cotContext = `COT data not available for ${markets[0]}. Provide general institutional analysis.`;
+      }
+    } else {
+      // Cross pair — combine both legs
+      const base  = COT_DATA[markets[0]];
+      const quote = COT_DATA[markets[1]];
 
-        if (base && quote) {
-          const bcn = base.longComm  - base.shortComm;
-          const qcn = quote.longComm - quote.shortComm;
-          const bsn = base.longSpec  - base.shortSpec;
-          const qsn = quote.longSpec - quote.shortSpec;
+      if (base && quote && base.oi > 0 && quote.oi > 0) {
+        const bcn = base.longComm  - base.shortComm;
+        const qcn = quote.longComm - quote.shortComm;
+        const bsn = base.longSpec  - base.shortSpec;
+        const qsn = quote.longSpec - quote.shortSpec;
 
-          const commBull = bcn > 0 && qcn < 0;
-          const commBear = bcn < 0 && qcn > 0;
-          const specBull = bsn > 0 && qsn < 0;
-          const specBear = bsn < 0 && qsn > 0;
+        const commBull = bcn > 0 && qcn < 0;
+        const commBear = bcn < 0 && qcn > 0;
+        const specBull = bsn > 0 && qsn < 0;
+        const specBear = bsn < 0 && qsn > 0;
 
-          const commSig = commBull ? "BULLISH CONFLUENCE — commercials long base, short quote"
-                        : commBear ? "BEARISH CONFLUENCE — commercials short base, long quote"
-                        : "MIXED — no clear directional confluence";
-          const specSig = specBull ? "BULLISH — speculators net long base, net short quote"
-                        : specBear ? "BEARISH — speculators net short base, net long quote"
-                        : "MIXED — conflicting speculator positioning";
-          const div = (commBull && specBear) || (commBear && specBull)
-                    ? "⚠ DIVERGENCE: Smart money vs speculators on opposite sides — high probability stop hunt or reversal setup."
-                    : "Smart money and speculators aligned — trend continuation bias.";
+        const commSig = commBull ? "BULLISH CONFLUENCE — commercials long base, short quote"
+                      : commBear ? "BEARISH CONFLUENCE — commercials short base, long quote"
+                      : "MIXED — no clear directional confluence";
+        const specSig = specBull ? "BULLISH — speculators net long base, net short quote"
+                      : specBear ? "BEARISH — speculators net short base, net long quote"
+                      : "MIXED — conflicting speculator positioning";
+        const div = (commBull && specBear) || (commBear && specBull)
+                  ? "⚠ DIVERGENCE: Smart money vs speculators on opposite sides — high probability stop hunt or reversal setup."
+                  : "Smart money and speculators aligned — trend continuation bias.";
 
-          cotContext = `
-REAL COT DATA — CROSS PAIR INFERENCE (CFTC Legacy Futures Only — ${base.reportDate})
+        cotContext = `
+REAL COT DATA — CROSS PAIR INFERENCE (CFTC CME Futures Only — ${COT_REPORT_DATE})
 Cross: ${asset} | Derived from: ${markets[0]} + ${markets[1]}
 
 BASE (${markets[0]}):
-  OI: ${base.openInterest.toLocaleString()} | Comm Net: ${net(base.longComm, base.shortComm)} | Spec Net: ${net(base.longSpec, base.shortSpec)}
+  OI: ${base.oi.toLocaleString()} | Comm Net: ${net(base.longComm, base.shortComm)} | Spec Net: ${net(base.longSpec, base.shortSpec)}
 
 QUOTE (${markets[1]}):
-  OI: ${quote.openInterest.toLocaleString()} | Comm Net: ${net(quote.longComm, quote.shortComm)} | Spec Net: ${net(quote.longSpec, quote.shortSpec)}
+  OI: ${quote.oi.toLocaleString()} | Comm Net: ${net(quote.longComm, quote.shortComm)} | Spec Net: ${net(quote.longSpec, quote.shortSpec)}
 
 CROSS INFERENCE:
   Commercial Signal: ${commSig}
   Speculator Signal: ${specSig}
   ${div}`;
-        } else {
-          cotContext = `Cross COT: ${markets[0]}: ${base ? 'found' : 'missing'}, ${markets[1]}: ${quote ? 'found' : 'missing'}. Provide general institutional positioning analysis.`;
-        }
+      } else {
+        cotContext = `COT cross inference unavailable for ${asset}. Provide general institutional analysis.`;
       }
-    } else {
-      cotContext = `CFTC does not publish COT data for ${asset}. Analyze via cross-market flows and price action.`;
     }
-  } catch (err) {
-    cotContext = `COT fetch failed (${err.message}). Provide general institutional positioning analysis for ${asset} based on known market dynamics.`;
+  } else {
+    cotContext = `CFTC does not publish COT data for ${asset}. Analyze via cross-market flows.`;
   }
 
   // ── 3. GROQ ANALYSIS ─────────────────────────────────────────────────────────
@@ -340,7 +241,7 @@ ${cotContext}
 Using ONLY the real data above, write a full institutional market structure briefing:
 1. FIBONACCI STRUCTURE — cite exact levels, identify which price is reacting to
 2. COT POSITIONING — use exact COT numbers, explain smart money vs speculator behaviour
-3. LIQUIDITY ENGINEERING — stop cluster locations relative to the Fibonacci levels
+3. LIQUIDITY ENGINEERING — stop cluster locations relative to Fibonacci levels
 4. SMART MONEY CONCEPTS — order blocks, fair value gaps, institutional traps
 5. MACRO CONTEXT — macro forces currently driving this asset
 6. SHADOW LOGISTICS — shipping, commodity, cross-market flows
