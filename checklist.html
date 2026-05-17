@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trade Checklist — Horizon Alpha</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@400;600;700;900&display=swap');
+
+:root {
+  --bg:      #07090f;
+  --bg2:     #0c0f1a;
+  --panel:   #0f1420;
+  --border:  #1a2338;
+  --border2: #243050;
+  --accent:  #00e5ff;
+  --accent2: #0099bb;
+  --green:   #00ff88;
+  --red:     #ff3355;
+  --yellow:  #ffd700;
+  --text:    #c8dae8;
+  --text2:   #6a8099;
+  --text3:   #334455;
+  --mono:    'Share Tech Mono', monospace;
+  --sans:    'Barlow', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  min-height: 100vh;
+  padding: 0;
+  font-size: 14px;
+}
+
+/* ── scanline overlay ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.08) 2px,
+    rgba(0,0,0,0.08) 4px
+  );
+  pointer-events: none;
+  z-index: 100;
+}
+
+/* ── header ── */
+.hdr {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+.hdr-left { display: flex; align-items: center; gap: 16px; }
+.hdr-back {
+  background: none;
+  border: 1px solid var(--border2);
+  color: var(--text2);
+  padding: 5px 12px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.2s, border-color 0.2s;
+}
+.hdr-back:hover { color: var(--accent); border-color: var(--accent); }
+.hdr-title {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--accent);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.hdr-pair {
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 3px;
+}
+.hdr-time {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text2);
+}
+
+/* ── main layout ── */
+.main { padding: 20px 24px; max-width: 1100px; margin: 0 auto; }
+
+/* ── verdict bar ── */
+.verdict {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 18px 24px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.verdict-signal {
+  font-family: var(--mono);
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  transition: color 0.3s;
+}
+.verdict-signal.go   { color: var(--green); text-shadow: 0 0 20px rgba(0,255,136,0.4); }
+.verdict-signal.nogo { color: var(--red);   text-shadow: 0 0 20px rgba(255,51,85,0.4); }
+.verdict-signal.wait { color: var(--yellow);text-shadow: 0 0 20px rgba(255,215,0,0.3); }
+.verdict-signal.idle { color: var(--text3); }
+
+.verdict-stats { display: flex; gap: 28px; align-items: center; }
+.vstat { text-align: center; }
+.vstat-num { font-family: var(--mono); font-size: 26px; font-weight: 700; line-height: 1; }
+.vstat-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--text2); margin-top: 3px; }
+.vstat-num.green { color: var(--green); }
+.vstat-num.red   { color: var(--red); }
+.vstat-num.yellow{ color: var(--yellow); }
+
+.progress-bar {
+  flex: 1;
+  min-width: 200px;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease, background 0.4s ease;
+  background: var(--text3);
+}
+
+.verdict-note {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text2);
+  max-width: 260px;
+  line-height: 1.5;
+}
+
+/* ── reset button ── */
+.btn-reset {
+  background: none;
+  border: 1px solid var(--border2);
+  color: var(--text2);
+  padding: 7px 16px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 1px;
+}
+.btn-reset:hover { color: var(--red); border-color: var(--red); }
+
+/* ── timeframe grid ── */
+.tf-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.tf-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 14px 18px;
+  display: grid;
+  grid-template-columns: 80px 1fr 1fr 1fr 1fr auto;
+  gap: 12px;
+  align-items: center;
+  transition: border-color 0.2s;
+}
+.tf-card:hover { border-color: var(--border2); }
+.tf-card.filled-up   { border-left: 3px solid var(--green); }
+.tf-card.filled-down { border-left: 3px solid var(--red); }
+.tf-card.filled-neutral { border-left: 3px solid var(--yellow); }
+
+.tf-label {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 1px;
+}
+.tf-label small {
+  display: block;
+  font-size: 9px;
+  color: var(--text3);
+  letter-spacing: 0;
+  margin-top: 1px;
+}
+
+/* ── field groups ── */
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text3);
+  font-weight: 700;
+}
+
+/* ── segment controls ── */
+.seg {
+  display: flex;
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.seg input[type="radio"] { display: none; }
+.seg label {
+  flex: 1;
+  text-align: center;
+  padding: 5px 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  cursor: pointer;
+  color: var(--text2);
+  background: var(--bg);
+  border: none;
+  letter-spacing: 0.5px;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.seg label:not(:last-child) { border-right: 1px solid var(--border2); }
+.seg input[value="up"]:checked   + label { background: rgba(0,255,136,0.15); color: var(--green); }
+.seg input[value="down"]:checked + label { background: rgba(255,51,85,0.15);  color: var(--red); }
+.seg input[value="neutral"]:checked + label { background: rgba(255,215,0,0.15); color: var(--yellow); }
+.seg input[value="consolidating"]:checked + label { background: rgba(255,215,0,0.15); color: var(--yellow); }
+.seg input[value="trending"]:checked + label { background: rgba(0,229,255,0.12); color: var(--accent); }
+.seg input[value="bullish"]:checked + label { background: rgba(0,255,136,0.15); color: var(--green); }
+.seg input[value="bearish"]:checked + label { background: rgba(255,51,85,0.15);  color: var(--red); }
+.seg input[value="doji"]:checked   + label { background: rgba(255,215,0,0.15);  color: var(--yellow); }
+
+/* ── fib input ── */
+.fib-input {
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 5px 8px;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.fib-input:focus { border-color: var(--accent); }
+.fib-input::placeholder { color: var(--text3); }
+
+/* ── status dot ── */
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text3);
+  transition: background 0.3s, box-shadow 0.3s;
+  flex-shrink: 0;
+}
+.status-dot.up      { background: var(--green); box-shadow: 0 0 6px rgba(0,255,136,0.5); }
+.status-dot.down    { background: var(--red);   box-shadow: 0 0 6px rgba(255,51,85,0.5); }
+.status-dot.neutral { background: var(--yellow);box-shadow: 0 0 6px rgba(255,215,0,0.4); }
+
+/* ── notes ── */
+.notes-section {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px 18px;
+  margin-top: 12px;
+}
+.notes-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text3);
+  margin-bottom: 8px;
+}
+.notes-input {
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 10px 12px;
+  width: 100%;
+  outline: none;
+  resize: vertical;
+  min-height: 60px;
+  transition: border-color 0.2s;
+  line-height: 1.5;
+}
+.notes-input:focus { border-color: var(--accent); }
+.notes-input::placeholder { color: var(--text3); }
+
+/* ── timestamp ── */
+.stamp {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text3);
+  text-align: right;
+  margin-top: 10px;
+}
+
+/* ── responsive ── */
+@media (max-width: 800px) {
+  .tf-card {
+    grid-template-columns: 70px 1fr 1fr;
+    grid-template-rows: auto auto;
+  }
+  .tf-card > :nth-child(5),
+  .tf-card > :nth-child(6) {
+    grid-column: span 1;
+  }
+  .verdict { flex-direction: column; align-items: flex-start; }
+}
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="hdr-left">
+    <a class="hdr-back" href="https://horizon-alpha-private.vercel.app">← HORIZON</a>
+    <div class="hdr-title">TRADE CHECKLIST</div>
+  </div>
+  <div class="hdr-pair" id="pair-display">GBP/JPY</div>
+  <div class="hdr-time" id="clock">--:-- UTC</div>
+</header>
+
+<div class="main">
+
+  <!-- Verdict bar -->
+  <div class="verdict">
+    <div>
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);margin-bottom:6px;font-family:var(--mono)">Signal</div>
+      <div class="verdict-signal idle" id="verdict-signal">WAITING</div>
+    </div>
+
+    <div class="verdict-stats">
+      <div class="vstat">
+        <div class="vstat-num green" id="stat-up">0</div>
+        <div class="vstat-lbl">Bullish</div>
+      </div>
+      <div class="vstat">
+        <div class="vstat-num red" id="stat-down">0</div>
+        <div class="vstat-lbl">Bearish</div>
+      </div>
+      <div class="vstat">
+        <div class="vstat-num yellow" id="stat-neutral">0</div>
+        <div class="vstat-lbl">Neutral</div>
+      </div>
+      <div class="vstat">
+        <div class="vstat-num" id="stat-consol" style="color:var(--text2)">0</div>
+        <div class="vstat-lbl">Consolidating</div>
+      </div>
+    </div>
+
+    <div style="flex:1;min-width:180px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">ALIGNMENT</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text2)" id="align-pct">0%</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+      </div>
+    </div>
+
+    <div class="verdict-note" id="verdict-note" style="font-family:var(--mono);font-size:11px;color:var(--text2);line-height:1.6">
+      Fill in all 9 timeframes.<br>GO = 7+ aligned, no consolidation on 5min.
+    </div>
+
+    <button class="btn-reset" onclick="resetAll()">⟳ RESET</button>
+  </div>
+
+  <!-- Timeframe cards -->
+  <div class="tf-grid" id="tf-grid"></div>
+
+  <!-- Notes -->
+  <div class="notes-section">
+    <div class="notes-label">Trade Notes</div>
+    <textarea class="notes-input" id="trade-notes" placeholder="Entry reasoning, news events, key levels to watch…"></textarea>
+  </div>
+
+  <div class="stamp" id="stamp"></div>
+
+</div>
+
+<script>
+const TIMEFRAMES = [
+  { id: 'MN', label: 'MN', sub: 'Monthly',  weight: 3 },
+  { id: 'W1', label: 'W1', sub: 'Weekly',   weight: 3 },
+  { id: 'D1', label: 'D1', sub: 'Daily',    weight: 2 },
+  { id: 'H4', label: 'H4', sub: '4 Hour',   weight: 2 },
+  { id: 'H1', label: 'H1', sub: '1 Hour',   weight: 1 },
+  { id: 'M30',label: 'M30',sub: '30 Min',   weight: 1 },
+  { id: 'M15',label: 'M15',sub: '15 Min',   weight: 1 },
+  { id: 'M5', label: 'M5', sub: '5 Min',    weight: 1 },
+  { id: 'M1', label: 'M1', sub: '1 Min',    weight: 1 },
+];
+
+const state = {};
+TIMEFRAMES.forEach(tf => {
+  state[tf.id] = { direction: null, fib: '', consolidating: null, candle: null };
+});
+
+function buildGrid() {
+  const grid = document.getElementById('tf-grid');
+  grid.innerHTML = '';
+  TIMEFRAMES.forEach(tf => {
+    const card = document.createElement('div');
+    card.className = 'tf-card';
+    card.id = 'card-' + tf.id;
+    card.innerHTML = `
+      <div class="tf-label">${tf.label}<small>${tf.sub}</small></div>
+
+      <div class="field">
+        <label>Direction</label>
+        <div class="seg">
+          <input type="radio" name="dir-${tf.id}" id="up-${tf.id}" value="up">
+          <label for="up-${tf.id}">▲ UP</label>
+          <input type="radio" name="dir-${tf.id}" id="dn-${tf.id}" value="down">
+          <label for="dn-${tf.id}">▼ DN</label>
+          <input type="radio" name="dir-${tf.id}" id="nt-${tf.id}" value="neutral">
+          <label for="nt-${tf.id}">– N</label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Fib Level</label>
+        <input type="text" class="fib-input" id="fib-${tf.id}" placeholder="23.6 / 38.2 / 50…" maxlength="12">
+      </div>
+
+      <div class="field">
+        <label>Market State</label>
+        <div class="seg">
+          <input type="radio" name="con-${tf.id}" id="con-${tf.id}" value="consolidating">
+          <label for="con-${tf.id}">COILING</label>
+          <input type="radio" name="con-${tf.id}" id="tre-${tf.id}" value="trending">
+          <label for="tre-${tf.id}">TRENDING</label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Candle</label>
+        <div class="seg">
+          <input type="radio" name="can-${tf.id}" id="cbull-${tf.id}" value="bullish">
+          <label for="cbull-${tf.id}">BULL</label>
+          <input type="radio" name="can-${tf.id}" id="cbear-${tf.id}" value="bearish">
+          <label for="cbear-${tf.id}">BEAR</label>
+          <input type="radio" name="can-${tf.id}" id="cdoji-${tf.id}" value="doji">
+          <label for="cdoji-${tf.id}">DOJI</label>
+        </div>
+      </div>
+
+      <div class="status-dot" id="dot-${tf.id}"></div>
+    `;
+    grid.appendChild(card);
+
+    // Direction listeners
+    document.getElementById('up-'+tf.id).addEventListener('change', () => { state[tf.id].direction = 'up'; update(); });
+    document.getElementById('dn-'+tf.id).addEventListener('change', () => { state[tf.id].direction = 'down'; update(); });
+    document.getElementById('nt-'+tf.id).addEventListener('change', () => { state[tf.id].direction = 'neutral'; update(); });
+
+    // Fib input
+    document.getElementById('fib-'+tf.id).addEventListener('input', e => {
+      state[tf.id].fib = e.target.value; update();
+    });
+
+    // Consolidation listeners
+    document.getElementById('con-'+tf.id).addEventListener('change', () => { state[tf.id].consolidating = true; update(); });
+    document.getElementById('tre-'+tf.id).addEventListener('change', () => { state[tf.id].consolidating = false; update(); });
+
+    // Candle listeners
+    document.getElementById('cbull-'+tf.id).addEventListener('change', () => { state[tf.id].candle = 'bullish'; update(); });
+    document.getElementById('cbear-'+tf.id).addEventListener('change', () => { state[tf.id].candle = 'bearish'; update(); });
+    document.getElementById('cdoji-'+tf.id).addEventListener('change', () => { state[tf.id].candle = 'doji';    update(); });
+  });
+}
+
+function update() {
+  let upCount = 0, downCount = 0, neutralCount = 0, consolCount = 0, filled = 0;
+  const dominant = { up: 0, down: 0 };
+
+  TIMEFRAMES.forEach(tf => {
+    const s = state[tf.id];
+    const card = document.getElementById('card-' + tf.id);
+    const dot  = document.getElementById('dot-'  + tf.id);
+
+    if (s.direction) {
+      filled++;
+      if (s.direction === 'up')      { upCount++;      dominant.up   += tf.weight; }
+      if (s.direction === 'down')    { downCount++;    dominant.down += tf.weight; }
+      if (s.direction === 'neutral') { neutralCount++; }
+      dot.className = 'status-dot ' + s.direction;
+      card.className = 'tf-card filled-' + s.direction;
+    } else {
+      dot.className = 'status-dot';
+      card.className = 'tf-card';
+    }
+
+    if (s.consolidating === true) consolCount++;
+  });
+
+  // Stats
+  document.getElementById('stat-up').textContent      = upCount;
+  document.getElementById('stat-down').textContent    = downCount;
+  document.getElementById('stat-neutral').textContent = neutralCount;
+  document.getElementById('stat-consol').textContent  = consolCount;
+
+  // Alignment
+  const total = filled > 0 ? filled : 1;
+  const maxDir = Math.max(upCount, downCount);
+  const alignPct = filled > 0 ? Math.round((maxDir / total) * 100) : 0;
+  document.getElementById('align-pct').textContent = alignPct + '%';
+
+  const fill = document.getElementById('progress-fill');
+  fill.style.width = alignPct + '%';
+  fill.style.background = alignPct >= 78 ? 'var(--green)' : alignPct >= 55 ? 'var(--yellow)' : 'var(--red)';
+
+  // Verdict
+  const sig   = document.getElementById('verdict-signal');
+  const note  = document.getElementById('verdict-note');
+  const m5con = state['M5'].consolidating === true;
+  const m5dir = state['M5'].direction;
+
+  if (filled < 9) {
+    sig.className = 'verdict-signal idle';
+    sig.textContent = 'WAITING';
+    note.textContent = `${filled}/9 timeframes complete. Fill all to get signal.`;
+    return;
+  }
+
+  const majorUp   = dominant.up   > dominant.down && upCount   >= 6;
+  const majorDown = dominant.down > dominant.up   && downCount >= 6;
+
+  if (m5con) {
+    sig.className = 'verdict-signal nogo';
+    sig.textContent = 'NO-GO';
+    note.textContent = '5min is consolidating — wait for the breakout before entering.';
+  } else if (majorUp && !m5con && m5dir === 'up') {
+    sig.className = 'verdict-signal go';
+    sig.textContent = 'GO LONG';
+    note.textContent = `${upCount}/9 bullish. Strong upside alignment. Look for 23.6% cross entry.`;
+  } else if (majorDown && !m5con && m5dir === 'down') {
+    sig.className = 'verdict-signal go';
+    sig.textContent = 'GO SHORT';
+    note.textContent = `${downCount}/9 bearish. Strong downside alignment. Look for 23.6% cross entry.`;
+  } else if (alignPct >= 55) {
+    sig.className = 'verdict-signal wait';
+    sig.textContent = 'WAIT';
+    note.textContent = 'Partial alignment. Higher timeframes conflict — not ideal risk/reward.';
+  } else {
+    sig.className = 'verdict-signal nogo';
+    sig.textContent = 'NO-GO';
+    note.textContent = 'Timeframes conflicted. No clear directional bias. Stand aside.';
+  }
+
+  // Stamp
+  document.getElementById('stamp').textContent = 'Checked: ' + new Date().toUTCString();
+}
+
+function resetAll() {
+  if (!confirm('Reset all timeframes?')) return;
+  TIMEFRAMES.forEach(tf => {
+    state[tf.id] = { direction: null, fib: '', consolidating: null, candle: null };
+    // Clear radios
+    document.querySelectorAll(`input[name="dir-${tf.id}"], input[name="con-${tf.id}"], input[name="can-${tf.id}"]`)
+      .forEach(r => r.checked = false);
+    document.getElementById('fib-'+tf.id).value = '';
+  });
+  document.getElementById('trade-notes').value = '';
+  document.getElementById('stamp').textContent = '';
+  update();
+}
+
+// Clock
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getUTCHours()).padStart(2,'0');
+  const m = String(now.getUTCMinutes()).padStart(2,'0');
+  const s = String(now.getUTCSeconds()).padStart(2,'0');
+  document.getElementById('clock').textContent = h+':'+m+':'+s+' UTC';
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+buildGrid();
+update();
+</script>
+</body>
+</html>
