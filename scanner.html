@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MA Scanner — Horizon Alpha</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@400;600;700;900&display=swap');
+
+:root {
+  --bg:      #07090f;
+  --bg2:     #0c0f1a;
+  --panel:   #0f1420;
+  --border:  #1a2338;
+  --border2: #243050;
+  --accent:  #00e5ff;
+  --green:   #00ff88;
+  --red:     #ff3355;
+  --yellow:  #ffd700;
+  --orange:  #ff8c00;
+  --text:    #c8dae8;
+  --text2:   #6a8099;
+  --text3:   #334455;
+  --mono:    'Share Tech Mono', monospace;
+  --sans:    'Barlow', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  min-height: 100vh;
+  font-size: 14px;
+}
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.07) 2px, rgba(0,0,0,0.07) 4px);
+  pointer-events: none;
+  z-index: 100;
+}
+
+/* ── header ── */
+.hdr {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+.hdr-left { display: flex; align-items: center; gap: 16px; }
+.hdr-back {
+  background: none;
+  border: 1px solid var(--border2);
+  color: var(--text2);
+  padding: 5px 12px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.2s, border-color 0.2s;
+}
+.hdr-back:hover { color: var(--accent); border-color: var(--accent); }
+.hdr-title { font-family: var(--mono); font-size: 13px; color: var(--accent); letter-spacing: 2px; text-transform: uppercase; }
+.hdr-time  { font-family: var(--mono); font-size: 11px; color: var(--text2); }
+
+/* ── main ── */
+.main { padding: 20px 24px; max-width: 1200px; margin: 0 auto; }
+
+/* ── scan controls ── */
+.scan-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.scan-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px 24px;
+}
+.scan-title {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--accent);
+  letter-spacing: 2px;
+  margin-bottom: 6px;
+}
+.scan-subtitle {
+  font-size: 11px;
+  color: var(--text3);
+  font-family: var(--mono);
+  margin-bottom: 16px;
+}
+.scan-mas {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.ma-badge {
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text2);
+}
+.ma-badge.fast   { border-color: var(--green);  color: var(--green); }
+.ma-badge.medium { border-color: var(--yellow); color: var(--yellow); }
+.ma-badge.slow   { border-color: var(--red);    color: var(--red); }
+
+.btn-scan {
+  width: 100%;
+  background: linear-gradient(135deg, rgba(0,229,255,0.15), rgba(0,153,187,0.15));
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  padding: 10px;
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+}
+.btn-scan:hover { background: rgba(0,229,255,0.2); transform: translateY(-1px); }
+.btn-scan:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+.btn-scan.running { border-color: var(--yellow); color: var(--yellow); background: rgba(255,215,0,0.08); }
+
+/* ── progress ── */
+.scan-progress {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 24px;
+  margin-bottom: 16px;
+  display: none;
+}
+.scan-progress.visible { display: block; }
+.progress-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text2);
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+}
+.progress-bar {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+.progress-current {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text3);
+}
+
+/* ── results ── */
+.results-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.results-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+.results-meta {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text3);
+}
+
+.results-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.signal-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 14px 16px;
+  transition: border-color 0.2s;
+}
+.signal-card.bull { border-left: 3px solid var(--green); }
+.signal-card.bear { border-left: 3px solid var(--red); }
+
+.sig-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.sig-pair {
+  font-family: var(--mono);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+.sig-pair.bull { color: var(--green); }
+.sig-pair.bear { color: var(--red); }
+
+.sig-dir {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 3px;
+  letter-spacing: 1px;
+}
+.sig-dir.bull { background: rgba(0,255,136,0.15); color: var(--green); }
+.sig-dir.bear { background: rgba(255,51,85,0.15);  color: var(--red); }
+
+.sig-detail {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text2);
+  line-height: 1.7;
+}
+.sig-detail span { color: var(--text); }
+
+.sig-strength {
+  display: flex;
+  gap: 3px;
+  margin-top: 8px;
+}
+.strength-pip {
+  height: 3px;
+  flex: 1;
+  border-radius: 2px;
+  background: var(--border2);
+}
+.strength-pip.active.bull { background: var(--green); }
+.strength-pip.active.bear { background: var(--red); }
+
+.no-signals {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 40px;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text3);
+}
+
+.btn-checklist {
+  display: inline-block;
+  background: rgba(0,229,255,0.08);
+  border: 1px solid var(--border2);
+  color: var(--accent);
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 10px;
+  cursor: pointer;
+  text-decoration: none;
+  margin-top: 8px;
+  transition: background 0.2s;
+  letter-spacing: 1px;
+}
+.btn-checklist:hover { background: rgba(0,229,255,0.15); }
+
+@media (max-width: 700px) {
+  .scan-controls { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="hdr-left">
+    <a class="hdr-back" href="https://horizon-alpha-private.vercel.app">← HORIZON</a>
+    <div class="hdr-title">MA CROSSOVER SCANNER</div>
+  </div>
+  <div class="hdr-time" id="clock">--:-- UTC</div>
+</header>
+
+<div class="main">
+
+  <!-- Scan Controls -->
+  <div class="scan-controls">
+    <div class="scan-card">
+      <div class="scan-title">4HR SCAN</div>
+      <div class="scan-subtitle">30 / 50 / 100 MA — Swing setups</div>
+      <div class="scan-mas">
+        <div class="ma-badge fast">MA30 fast</div>
+        <div class="ma-badge medium">MA50 signal</div>
+        <div class="ma-badge slow">MA100 trend</div>
+      </div>
+      <button class="btn-scan" id="btn-4h" onclick="runScan('4h')">▶ SCAN 4HR — ALL PAIRS</button>
+    </div>
+    <div class="scan-card">
+      <div class="scan-title">1HR SCAN</div>
+      <div class="scan-subtitle">20 / 50 / 100 MA — Intraday setups</div>
+      <div class="scan-mas">
+        <div class="ma-badge fast">MA20 fast</div>
+        <div class="ma-badge medium">MA50 signal</div>
+        <div class="ma-badge slow">MA100 trend</div>
+      </div>
+      <button class="btn-scan" id="btn-1h" onclick="runScan('1h')">▶ SCAN 1HR — ALL PAIRS</button>
+    </div>
+  </div>
+
+  <!-- Progress -->
+  <div class="scan-progress" id="progress-box">
+    <div class="progress-label">
+      <span id="prog-label">Scanning…</span>
+      <span id="prog-pct">0%</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+    <div class="progress-current" id="prog-current">Initializing…</div>
+  </div>
+
+  <!-- Results -->
+  <div id="results-section" style="display:none">
+    <div class="results-header">
+      <div class="results-title" id="results-title">Results</div>
+      <div class="results-meta" id="results-meta"></div>
+    </div>
+    <div class="results-grid" id="signals-grid"></div>
+    <div id="no-signals" class="no-signals" style="display:none">
+      No MA crossover signals found on this timeframe.<br>
+      <span style="color:var(--text3);font-size:10px">Markets may be in consolidation across the board.</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const PAIRS = [
+  // 7 Majors
+  'AUD/USD','EUR/USD','GBP/USD','NZD/USD','USD/CAD','USD/CHF','USD/JPY',
+  // Crosses
+  'AUD/CAD','AUD/CHF','AUD/JPY','AUD/NZD',
+  'CAD/CHF','CAD/JPY','CHF/JPY',
+  'EUR/AUD','EUR/CAD','EUR/CHF','EUR/GBP','EUR/JPY','EUR/NZD',
+  'GBP/AUD','GBP/CAD','GBP/CHF','GBP/JPY','GBP/NZD',
+  'NZD/CAD','NZD/CHF','NZD/JPY',
+  // Crypto & Commodities
+  'BTC/USD','XAU/USD','XAG/USD'
+];
+
+// Convert pair format for Twelve Data API
+function toSymbol(pair) {
+  return pair.replace('/', '');
+}
+
+function toTwelveSymbol(pair) {
+  if (pair === 'XAU/USD') return 'XAU/USD';
+  if (pair === 'XAG/USD') return 'XAG/USD';
+  if (pair === 'BTC/USD') return 'BTC/USD';
+  return pair;
+}
+
+function calcMA(closes, period) {
+  if (closes.length < period) return null;
+  const slice = closes.slice(closes.length - period);
+  return slice.reduce((a, b) => a + b, 0) / period;
+}
+
+async function fetchCandles(pair, interval) {
+  const symbol = toTwelveSymbol(pair);
+  const outputsize = 120; // enough for MA100 + buffer
+  const url = `/api/ma-scan?symbol=${encodeURIComponent(symbol)}&interval=${interval}`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('API error');
+  const d = await r.json();
+  return d.closes || null;
+}
+
+let scanning = false;
+
+async function runScan(tf) {
+  if (scanning) return;
+  scanning = true;
+
+  const btn4h = document.getElementById('btn-4h');
+  const btn1h = document.getElementById('btn-1h');
+  btn4h.disabled = true;
+  btn1h.disabled = true;
+  const activeBtn = document.getElementById(tf === '4h' ? 'btn-4h' : 'btn-1h');
+  activeBtn.classList.add('running');
+  activeBtn.textContent = '⟳ SCANNING…';
+
+  const progBox = document.getElementById('progress-box');
+  progBox.classList.add('visible');
+  document.getElementById('results-section').style.display = 'none';
+
+  const interval = tf === '4h' ? '4h' : '1h';
+  const maFast   = tf === '4h' ? 30  : 20;
+  const maMid    = 50;
+  const maSlow   = 100;
+
+  const signals = [];
+  const errors  = [];
+
+  for (let i = 0; i < PAIRS.length; i++) {
+    const pair = PAIRS[i];
+    const pct  = Math.round(((i + 1) / PAIRS.length) * 100);
+
+    document.getElementById('prog-label').textContent   = `Scanning ${tf.toUpperCase()} — ${i+1}/${PAIRS.length}`;
+    document.getElementById('prog-pct').textContent     = pct + '%';
+    document.getElementById('prog-fill').style.width    = pct + '%';
+    document.getElementById('prog-current').textContent = `→ ${pair}`;
+
+    try {
+      const closes = await fetchCandles(pair, interval);
+      if (!closes || closes.length < maSlow + 5) { errors.push(pair); continue; }
+
+      // Calculate MAs on last 2 candles to detect recent cross
+      const fast_now  = calcMA(closes, maFast);
+      const mid_now   = calcMA(closes, maMid);
+      const slow_now  = calcMA(closes, maSlow);
+
+      // Previous candle MAs (shift by 1)
+      const prev = closes.slice(0, -1);
+      const fast_prev = calcMA(prev, maFast);
+      const mid_prev  = calcMA(prev, maMid);
+
+      if (!fast_now || !mid_now || !slow_now || !fast_prev || !mid_prev) continue;
+
+      // Detect cross: fast crossed above/below mid in last candle
+      const crossedUp   = fast_prev <= mid_prev && fast_now > mid_now;
+      const crossedDown = fast_prev >= mid_prev && fast_now < mid_now;
+
+      // Trend filter: price side of slow MA
+      const lastClose = closes[closes.length - 1];
+      const trendUp   = lastClose > slow_now;
+      const trendDown = lastClose < slow_now;
+
+      // Signal: cross must align with trend
+      if (crossedUp && trendUp) {
+        const strength = Math.min(5, Math.round(((fast_now - mid_now) / mid_now) * 10000));
+        signals.push({ pair, dir: 'bull', fast: fast_now, mid: mid_now, slow: slow_now, price: lastClose, strength: Math.max(1, strength), maFast, maMid, maSlow });
+      } else if (crossedDown && trendDown) {
+        const strength = Math.min(5, Math.round(((mid_now - fast_now) / mid_now) * 10000));
+        signals.push({ pair, dir: 'bear', fast: fast_now, mid: mid_now, slow: slow_now, price: lastClose, strength: Math.max(1, strength), maFast, maMid, maSlow });
+      }
+    } catch(e) {
+      errors.push(pair);
+    }
+
+    // Rate limit — Twelve Data free tier
+    await new Promise(r => setTimeout(r, 500));
+  }
+
+  // Show results
+  progBox.classList.remove('visible');
+  document.getElementById('results-section').style.display = 'block';
+
+  const tfLabel = tf === '4h' ? '4HR (MA30/50/100)' : '1HR (MA20/50/100)';
+  document.getElementById('results-title').textContent = `${tfLabel} — ${signals.length} signal${signals.length !== 1 ? 's' : ''} found`;
+  document.getElementById('results-meta').textContent  = `Scanned ${PAIRS.length - errors.length}/${PAIRS.length} pairs · ${new Date().toUTCString().slice(17,22)} UTC`;
+
+  const grid = document.getElementById('signals-grid');
+  const noSig = document.getElementById('no-signals');
+  grid.innerHTML = '';
+
+  if (signals.length === 0) {
+    noSig.style.display = 'block';
+    grid.style.display  = 'none';
+  } else {
+    noSig.style.display = 'none';
+    grid.style.display  = 'grid';
+
+    // Sort: bull first, then bear
+    signals.sort((a,b) => a.dir === b.dir ? 0 : a.dir === 'bull' ? -1 : 1);
+
+    signals.forEach(s => {
+      const card = document.createElement('div');
+      card.className = `signal-card ${s.dir}`;
+
+      const pips = Array.from({length:5}, (_,i) => `<div class="strength-pip ${i < s.strength ? 'active '+s.dir : ''}"></div>`).join('');
+
+      card.innerHTML = `
+        <div class="sig-header">
+          <div class="sig-pair ${s.dir}">${s.pair}</div>
+          <div class="sig-dir ${s.dir}">${s.dir === 'bull' ? '▲ LONG' : '▼ SHORT'}</div>
+        </div>
+        <div class="sig-detail">
+          MA${s.maFast} <span>${s.fast.toFixed(5)}</span> crossed ${s.dir === 'bull' ? 'above' : 'below'} MA${s.maMid} <span>${s.mid.toFixed(5)}</span><br>
+          Trend MA${s.maSlow}: <span>${s.slow.toFixed(5)}</span> · Price: <span>${s.price.toFixed(5)}</span>
+        </div>
+        <div class="sig-strength">${pips}</div>
+        <a class="btn-checklist" href="/checklist">→ RUN CHECKLIST</a>
+      `;
+      grid.appendChild(card);
+    });
+  }
+
+  activeBtn.classList.remove('running');
+  activeBtn.textContent = tf === '4h' ? '▶ SCAN 4HR — ALL PAIRS' : '▶ SCAN 1HR — ALL PAIRS';
+  btn4h.disabled = false;
+  btn1h.disabled = false;
+  scanning = false;
+}
+
+// Clock
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getUTCHours()).padStart(2,'0');
+  const m = String(now.getUTCMinutes()).padStart(2,'0');
+  const s = String(now.getUTCSeconds()).padStart(2,'0');
+  document.getElementById('clock').textContent = h+':'+m+':'+s+' UTC';
+}
+setInterval(updateClock, 1000);
+updateClock();
+</script>
+</body>
+</html>
