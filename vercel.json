@@ -2,6 +2,7 @@
   "version": 2,
   "routes": [
     { "src": "/checklist", "dest": "/checklist.html" },
-    { "src": "/(.*)", "dest": "/index.html" }
+    { "src": "/scanner",   "dest": "/scanner.html" },
+    { "src": "/(.*)",      "dest": "/index.html" }
   ]
 }
