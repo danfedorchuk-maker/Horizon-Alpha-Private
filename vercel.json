@@ -3,6 +3,7 @@
   "routes": [
     { "src": "/checklist", "dest": "/checklist.html" },
     { "src": "/scanner",   "dest": "/scanner.html" },
-    { "src": "/(.*)",      "dest": "/index.html" }
+    { "src": "/levels",    "dest": "/sr-levels.html" },
+    { "src": "/api/(.*)",  "dest": "/api/$1" }
   ]
 }
