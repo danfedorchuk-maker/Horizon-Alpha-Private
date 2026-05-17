@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>S&R Levels — Horizon Alpha</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@400;600;700;900&display=swap');
+
+:root {
+  --bg:      #07090f;
+  --bg2:     #0c0f1a;
+  --panel:   #0f1420;
+  --border:  #1a2338;
+  --border2: #243050;
+  --accent:  #00e5ff;
+  --green:   #00ff88;
+  --red:     #ff3355;
+  --yellow:  #ffd700;
+  --orange:  #ff8c00;
+  --purple:  #a855f7;
+  --text:    #c8dae8;
+  --text2:   #6a8099;
+  --text3:   #334455;
+  --mono:    'Share Tech Mono', monospace;
+  --sans:    'Barlow', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; font-size: 14px; }
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.07) 2px, rgba(0,0,0,0.07) 4px);
+  pointer-events: none;
+  z-index: 100;
+}
+
+.hdr {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  gap: 16px;
+}
+.hdr-left { display: flex; align-items: center; gap: 16px; }
+.hdr-back {
+  background: none;
+  border: 1px solid var(--border2);
+  color: var(--text2);
+  padding: 5px 12px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.2s, border-color 0.2s;
+}
+.hdr-back:hover { color: var(--accent); border-color: var(--accent); }
+.hdr-title { font-family: var(--mono); font-size: 13px; color: var(--accent); letter-spacing: 2px; text-transform: uppercase; }
+.hdr-time  { font-family: var(--mono); font-size: 11px; color: var(--text2); }
+
+.pair-select {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+}
+
+.main { padding: 20px 24px; max-width: 1100px; margin: 0 auto; }
+
+/* ── control bar ── */
+.control-bar {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 18px 24px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.ctrl-group { display: flex; flex-direction: column; gap: 5px; }
+.ctrl-label { font-family: var(--mono); font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text3); }
+.ctrl-val   { font-family: var(--mono); font-size: 12px; color: var(--text2); }
+
+.tf-toggles { display: flex; gap: 6px; flex-wrap: wrap; }
+.tf-toggle {
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  color: var(--text3);
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+}
+.tf-toggle.active { border-color: var(--accent); color: var(--accent); background: rgba(0,229,255,0.08); }
+
+.btn-find {
+  margin-left: auto;
+  background: linear-gradient(135deg, rgba(0,229,255,0.15), rgba(0,153,187,0.15));
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  padding: 10px 24px;
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+.btn-find:hover { background: rgba(0,229,255,0.2); }
+.btn-find:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── progress ── */
+.progress-box {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 24px;
+  margin-bottom: 16px;
+  display: none;
+}
+.progress-box.visible { display: block; }
+.prog-top { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11px; color: var(--text2); margin-bottom: 8px; }
+.prog-bar { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.prog-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s; }
+.prog-sub { font-family: var(--mono); font-size: 10px; color: var(--text3); margin-top: 6px; }
+
+/* ── price context ── */
+.price-ctx {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 20px;
+  margin-bottom: 16px;
+  display: none;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.price-ctx.visible { display: flex; gap: 32px; flex-wrap: wrap; align-items: center; }
+.ctx-item { display: flex; flex-direction: column; gap: 3px; }
+.ctx-lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text3); }
+.ctx-val { font-size: 15px; font-weight: 700; }
+
+/* ── levels display ── */
+.levels-section { display: none; }
+.levels-section.visible { display: block; }
+
+.levels-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.levels-title { font-family: var(--mono); font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 1.5px; }
+.levels-meta  { font-family: var(--mono); font-size: 10px; color: var(--text3); }
+
+/* ── visual price ladder ── */
+.ladder {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 16px;
+  position: relative;
+}
+.ladder-inner { position: relative; padding: 12px 0; }
+
+.level-row {
+  display: grid;
+  grid-template-columns: 90px 1fr 80px 100px 80px;
+  align-items: center;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+  transition: background 0.15s;
+  position: relative;
+}
+.level-row:last-child { border-bottom: none; }
+.level-row:hover { background: rgba(255,255,255,0.02); }
+.level-row.current-price { background: rgba(0,229,255,0.05); border-left: 3px solid var(--accent); }
+
+.level-price {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+}
+.level-price.resistance { color: var(--red); }
+.level-price.support    { color: var(--green); }
+.level-price.current    { color: var(--accent); }
+
+.level-bar-wrap { position: relative; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.level-bar { height: 100%; border-radius: 3px; }
+.level-bar.resistance { background: var(--red); }
+.level-bar.support    { background: var(--green); }
+
+.level-tf {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  text-align: center;
+  font-weight: 700;
+}
+.tf-monthly { background: rgba(168,85,247,0.2); color: var(--purple); border: 1px solid rgba(168,85,247,0.3); }
+.tf-weekly  { background: rgba(255,140,0,0.15); color: var(--orange); border: 1px solid rgba(255,140,0,0.3); }
+.tf-daily   { background: rgba(0,229,255,0.12); color: var(--accent); border: 1px solid rgba(0,229,255,0.2); }
+.tf-4h      { background: rgba(255,215,0,0.12); color: var(--yellow); border: 1px solid rgba(255,215,0,0.2); }
+
+.level-touches { font-family: var(--mono); font-size: 11px; color: var(--text2); text-align: right; }
+.level-type    { font-family: var(--mono); font-size: 10px; text-align: right; }
+.level-type.resistance { color: var(--red); }
+.level-type.support    { color: var(--green); }
+
+.current-marker {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--accent);
+  background: rgba(0,229,255,0.12);
+  border: 1px solid var(--accent);
+  padding: 8px 20px;
+  text-align: center;
+  letter-spacing: 2px;
+}
+
+.score-pip { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 2px; }
+.score-pip.filled.resistance { background: var(--red); }
+.score-pip.filled.support    { background: var(--green); }
+.score-pip.empty  { background: var(--border2); }
+
+.no-results {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 40px;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text3);
+}
+
+@media (max-width: 700px) {
+  .level-row { grid-template-columns: 80px 1fr 60px; }
+  .level-row > :nth-child(4), .level-row > :nth-child(5) { display: none; }
+  .control-bar { flex-direction: column; align-items: flex-start; }
+  .btn-find { margin-left: 0; width: 100%; }
+}
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="hdr-left">
+    <a class="hdr-back" href="https://horizon-alpha-private.vercel.app">← HORIZON</a>
+    <div class="hdr-title">S&amp;R LEVELS</div>
+  </div>
+  <select class="pair-select" id="pair-select">
+    <optgroup label="── 7 MAJORS ──">
+      <option>AUD/USD</option><option>EUR/USD</option><option>GBP/USD</option>
+      <option>NZD/USD</option><option>USD/CAD</option><option>USD/CHF</option><option>USD/JPY</option>
+    </optgroup>
+    <optgroup label="── CROSSES ──">
+      <option>AUD/CAD</option><option>AUD/CHF</option><option>AUD/JPY</option><option>AUD/NZD</option>
+      <option>CAD/CHF</option><option>CAD/JPY</option><option>CHF/JPY</option>
+      <option>EUR/AUD</option><option>EUR/CAD</option><option>EUR/CHF</option><option>EUR/GBP</option>
+      <option>EUR/JPY</option><option>EUR/NZD</option>
+      <option>GBP/AUD</option><option>GBP/CAD</option><option>GBP/CHF</option>
+      <option selected>GBP/JPY</option><option>GBP/NZD</option>
+      <option>NZD/CAD</option><option>NZD/CHF</option><option>NZD/JPY</option>
+    </optgroup>
+    <optgroup label="── CRYPTO & METALS ──">
+      <option>BTC/USD</option><option>XAU/USD</option><option>XAG/USD</option>
+    </optgroup>
+  </select>
+  <div class="hdr-time" id="clock">--:-- UTC</div>
+</header>
+
+<div class="main">
+
+  <!-- Controls -->
+  <div class="control-bar">
+    <div class="ctrl-group">
+      <div class="ctrl-label">Timeframes to scan</div>
+      <div class="tf-toggles">
+        <div class="tf-toggle active" data-tf="1month" onclick="toggleTF(this)">MN</div>
+        <div class="tf-toggle active" data-tf="1week"  onclick="toggleTF(this)">W1</div>
+        <div class="tf-toggle active" data-tf="1day"   onclick="toggleTF(this)">D1</div>
+        <div class="tf-toggle active" data-tf="4h"     onclick="toggleTF(this)">H4</div>
+      </div>
+    </div>
+    <div class="ctrl-group">
+      <div class="ctrl-label">Min touches to qualify</div>
+      <div style="display:flex;gap:6px">
+        <div class="tf-toggle" data-touches="2" onclick="setTouches(this)">2+</div>
+        <div class="tf-toggle active" data-touches="3" onclick="setTouches(this)">3+</div>
+        <div class="tf-toggle" data-touches="4" onclick="setTouches(this)">4+</div>
+      </div>
+    </div>
+    <div class="ctrl-group">
+      <div class="ctrl-label">Max levels shown</div>
+      <div style="display:flex;gap:6px">
+        <div class="tf-toggle" data-max="8"  onclick="setMax(this)">8</div>
+        <div class="tf-toggle active" data-max="12" onclick="setMax(this)">12</div>
+        <div class="tf-toggle" data-max="20" onclick="setMax(this)">20</div>
+      </div>
+    </div>
+    <button class="btn-find" id="btn-find" onclick="findLevels()">▶ FIND S&amp;R LEVELS</button>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-box" id="progress-box">
+    <div class="prog-top">
+      <span id="prog-label">Fetching data…</span>
+      <span id="prog-pct">0%</span>
+    </div>
+    <div class="prog-bar"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+    <div class="prog-sub" id="prog-sub">Initializing…</div>
+  </div>
+
+  <!-- Price context -->
+  <div class="price-ctx" id="price-ctx">
+    <div class="ctx-item"><div class="ctx-lbl">Pair</div><div class="ctx-val" id="ctx-pair" style="color:var(--accent)">—</div></div>
+    <div class="ctx-item"><div class="ctx-lbl">Current Price</div><div class="ctx-val" id="ctx-price">—</div></div>
+    <div class="ctx-item"><div class="ctx-lbl">Nearest Support</div><div class="ctx-val" id="ctx-sup" style="color:var(--green)">—</div></div>
+    <div class="ctx-item"><div class="ctx-lbl">Nearest Resistance</div><div class="ctx-val" id="ctx-res" style="color:var(--red)">—</div></div>
+    <div class="ctx-item"><div class="ctx-lbl">Levels Found</div><div class="ctx-val" id="ctx-count">—</div></div>
+    <div class="ctx-item"><div class="ctx-lbl">Scanned</div><div class="ctx-val" id="ctx-time" style="font-size:11px;color:var(--text2)">—</div></div>
+  </div>
+
+  <!-- Levels -->
+  <div class="levels-section" id="levels-section">
+    <div class="levels-header">
+      <div class="levels-title" id="levels-title">Key S&amp;R Levels</div>
+      <div class="levels-meta">Sorted by price — current price shown inline</div>
+    </div>
+    <div class="ladder" id="ladder"></div>
+  </div>
+
+  <div class="no-results" id="no-results" style="display:none">
+    No significant S&amp;R levels found with current settings.<br>
+    <span style="color:var(--text3);font-size:10px">Try lowering the minimum touches or adding more timeframes.</span>
+  </div>
+
+</div>
+
+<script>
+let activeTFs     = new Set(['1month','1week','1day','4h']);
+let minTouches    = 3;
+let maxLevels     = 12;
+
+function toggleTF(el) {
+  const tf = el.dataset.tf;
+  if (activeTFs.has(tf)) { activeTFs.delete(tf); el.classList.remove('active'); }
+  else                    { activeTFs.add(tf);    el.classList.add('active'); }
+}
+function setTouches(el) {
+  document.querySelectorAll('[data-touches]').forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+  minTouches = parseInt(el.dataset.touches);
+}
+function setMax(el) {
+  document.querySelectorAll('[data-max]').forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+  maxLevels = parseInt(el.dataset.max);
+}
+
+const TF_CONFIG = {
+  '1month': { label: 'MN', weight: 4, cls: 'tf-monthly', outputsize: 60  },
+  '1week':  { label: 'W1', weight: 3, cls: 'tf-weekly',  outputsize: 104 },
+  '1day':   { label: 'D1', weight: 2, cls: 'tf-daily',   outputsize: 365 },
+  '4h':     { label: 'H4', weight: 1, cls: 'tf-4h',      outputsize: 500 },
+};
+
+function fmtPrice(p, dp) { return p.toFixed(dp); }
+
+function detectDP(price) {
+  if (price > 10000) return 0;
+  if (price > 100)   return 2;
+  if (price > 10)    return 3;
+  return 5;
+}
+
+function findSwingLevels(candles, tolerance, weight, tfLabel, tfCls) {
+  const levels = [];
+  const n = candles.length;
+  if (n < 5) return levels;
+
+  for (let i = 2; i < n - 2; i++) {
+    const h = candles[i].high;
+    const l = candles[i].low;
+
+    // Swing high
+    if (h > candles[i-1].high && h > candles[i-2].high && h > candles[i+1].high && h > candles[i+2].high) {
+      levels.push({ price: h, type: 'resistance', weight, tfLabel, tfCls, touches: 1, date: candles[i].datetime });
+    }
+    // Swing low
+    if (l < candles[i-1].low && l < candles[i-2].low && l < candles[i+1].low && l < candles[i+2].low) {
+      levels.push({ price: l, type: 'support', weight, tfLabel, tfCls, touches: 1, date: candles[i].datetime });
+    }
+  }
+  return levels;
+}
+
+function clusterLevels(allLevels, tolerance) {
+  if (!allLevels.length) return [];
+  const sorted = [...allLevels].sort((a, b) => a.price - b.price);
+  const clusters = [];
+
+  let cluster = [sorted[0]];
+  for (let i = 1; i < sorted.length; i++) {
+    const last = cluster[cluster.length - 1];
+    if (Math.abs(sorted[i].price - last.price) / last.price < tolerance) {
+      cluster.push(sorted[i]);
+    } else {
+      clusters.push(cluster);
+      cluster = [sorted[i]];
+    }
+  }
+  clusters.push(cluster);
+
+  return clusters.map(cl => {
+    const avgPrice = cl.reduce((s, l) => s + l.price, 0) / cl.length;
+    const totalWeight = cl.reduce((s, l) => s + l.weight, 0);
+    const touches = cl.length;
+    // Dominant type
+    const resCount = cl.filter(l => l.type === 'resistance').length;
+    const supCount = cl.filter(l => l.type === 'support').length;
+    const type = resCount >= supCount ? 'resistance' : 'support';
+    // Best timeframe (highest weight)
+    const best = cl.reduce((a, b) => a.weight > b.weight ? a : b);
+    return { price: avgPrice, type, touches, weight: totalWeight, tfLabel: best.tfLabel, tfCls: best.tfCls };
+  });
+}
+
+async function fetchTFCandles(symbol, interval, outputsize) {
+  const url = `/api/ma-scan?symbol=${encodeURIComponent(symbol)}&interval=${interval}&outputsize=${outputsize}&ohlc=true`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('fetch failed');
+  const d = await r.json();
+  return d.candles || null;
+}
+
+async function findLevels() {
+  const pair   = document.getElementById('pair-select').value;
+  const tfs    = [...activeTFs];
+  if (!tfs.length) { alert('Select at least one timeframe.'); return; }
+
+  const btn = document.getElementById('btn-find');
+  btn.disabled = true;
+  btn.textContent = '⟳ SCANNING…';
+
+  document.getElementById('progress-box').classList.add('visible');
+  document.getElementById('price-ctx').classList.remove('visible');
+  document.getElementById('levels-section').classList.remove('visible');
+  document.getElementById('no-results').style.display = 'none';
+
+  let currentPrice = null;
+  let allLevels    = [];
+  let dp           = 5;
+
+  for (let i = 0; i < tfs.length; i++) {
+    const tf  = tfs[i];
+    const cfg = TF_CONFIG[tf];
+    const pct = Math.round(((i + 1) / tfs.length) * 100);
+
+    document.getElementById('prog-label').textContent = `Fetching ${cfg.label} candles…`;
+    document.getElementById('prog-pct').textContent   = pct + '%';
+    document.getElementById('prog-fill').style.width  = pct + '%';
+    document.getElementById('prog-sub').textContent   = `→ ${pair} ${cfg.label}`;
+
+    try {
+      const candles = await fetchTFCandles(pair, tf, cfg.outputsize);
+      if (!candles || !candles.length) continue;
+
+      if (!currentPrice) {
+        currentPrice = candles[0].close;
+        dp = detectDP(currentPrice);
+      }
+
+      const range    = Math.max(...candles.map(c => c.high)) - Math.min(...candles.map(c => c.low));
+      const tolerance = range * 0.005; // 0.5% of range as swing tolerance
+      const swings   = findSwingLevels(candles, tolerance, cfg.weight, cfg.label, cfg.cls);
+      allLevels = allLevels.concat(swings);
+    } catch(e) {
+      console.warn('Failed:', tf, e);
+    }
+
+    await new Promise(r => setTimeout(r, 300));
+  }
+
+  document.getElementById('progress-box').classList.remove('visible');
+
+  if (!currentPrice || !allLevels.length) {
+    document.getElementById('no-results').style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = '▶ FIND S&R LEVELS';
+    return;
+  }
+
+  // Cluster nearby levels
+  const tolerance = currentPrice > 100 ? 0.003 : 0.002;
+  const clustered = clusterLevels(allLevels, tolerance);
+
+  // Filter by min touches and sort by score
+  const filtered = clustered
+    .filter(l => l.touches >= minTouches)
+    .sort((a, b) => (b.touches * b.weight) - (a.touches * a.weight))
+    .slice(0, maxLevels);
+
+  if (!filtered.length) {
+    document.getElementById('no-results').style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = '▶ FIND S&R LEVELS';
+    return;
+  }
+
+  // Sort by price descending for ladder display
+  const sorted = [...filtered].sort((a, b) => b.price - a.price);
+
+  // Find nearest support and resistance
+  const above  = sorted.filter(l => l.price > currentPrice);
+  const below  = sorted.filter(l => l.price < currentPrice);
+  const nearRes = above.length ? above[above.length - 1] : null;
+  const nearSup = below.length ? below[0] : null;
+
+  // Max score for bar width
+  const maxScore = Math.max(...filtered.map(l => l.touches * l.weight));
+
+  // Price context
+  document.getElementById('ctx-pair').textContent  = pair;
+  document.getElementById('ctx-price').textContent = fmtPrice(currentPrice, dp);
+  document.getElementById('ctx-sup').textContent   = nearSup  ? fmtPrice(nearSup.price, dp)  : '—';
+  document.getElementById('ctx-res').textContent   = nearRes  ? fmtPrice(nearRes.price, dp)  : '—';
+  document.getElementById('ctx-count').textContent = filtered.length + ' levels';
+  document.getElementById('ctx-time').textContent  = new Date().toUTCString().slice(0, 25);
+  document.getElementById('price-ctx').classList.add('visible');
+
+  // Build ladder
+  const ladder = document.getElementById('ladder');
+  ladder.innerHTML = '';
+  let currentInserted = false;
+
+  sorted.forEach(level => {
+    // Insert current price marker
+    if (!currentInserted && level.price < currentPrice) {
+      const marker = document.createElement('div');
+      marker.className = 'current-marker';
+      marker.textContent = `▶ CURRENT PRICE: ${fmtPrice(currentPrice, dp)}`;
+      ladder.appendChild(marker);
+      currentInserted = true;
+    }
+
+    const score    = level.touches * level.weight;
+    const barWidth = Math.round((score / maxScore) * 100);
+    const pips     = Array.from({length: 5}, (_, i) => {
+      const filled = i < Math.min(5, Math.ceil(score / maxScore * 5));
+      return `<span class="score-pip ${filled ? 'filled ' + level.type : 'empty'}"></span>`;
+    }).join('');
+
+    const row = document.createElement('div');
+    row.className = 'level-row' + (Math.abs(level.price - currentPrice) / currentPrice < 0.001 ? ' current-price' : '');
+    row.innerHTML = `
+      <div class="level-price ${level.type}">${fmtPrice(level.price, dp)}</div>
+      <div class="level-bar-wrap"><div class="level-bar ${level.type}" style="width:${barWidth}%"></div></div>
+      <div class="level-tf ${level.tfCls}">${level.tfLabel}</div>
+      <div class="level-touches">${pips} ${level.touches} touch${level.touches !== 1 ? 'es' : ''}</div>
+      <div class="level-type ${level.type}">${level.type.toUpperCase()}</div>
+    `;
+    ladder.appendChild(row);
+  });
+
+  if (!currentInserted) {
+    const marker = document.createElement('div');
+    marker.className = 'current-marker';
+    marker.textContent = `▶ CURRENT PRICE: ${fmtPrice(currentPrice, dp)}`;
+    ladder.appendChild(marker);
+  }
+
+  document.getElementById('levels-title').textContent = `${pair} — Key S&R Levels (${filtered.length} found)`;
+  document.getElementById('levels-section').classList.add('visible');
+
+  btn.disabled = false;
+  btn.textContent = '▶ FIND S&R LEVELS';
+}
+
+// Clock
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getUTCHours()).padStart(2,'0');
+  const m = String(now.getUTCMinutes()).padStart(2,'0');
+  const s = String(now.getUTCSeconds()).padStart(2,'0');
+  document.getElementById('clock').textContent = h+':'+m+':'+s+' UTC';
+}
+setInterval(updateClock, 1000);
+updateClock();
+</script>
+</body>
+</html>
