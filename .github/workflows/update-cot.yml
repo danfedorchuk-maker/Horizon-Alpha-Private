@@ -1,0 +1,29 @@
+name: Update COT Data
+
+on:
+  schedule:
+    - cron: '30 21 * * 5'
+  workflow_dispatch:
+
+jobs:
+  update-cot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Fetch and update COT data
+        run: node .github/scripts/update-cot.js
+
+      - name: Commit changes
+        run: |
+          git config user.name "COT Bot"
+          git config user.email "cot-bot@horizon-alpha"
+          git add api/analyze.js
+          git diff --staged --quiet || git commit -m "Auto-update COT data $(date +%Y-%m-%d)"
+          git push
