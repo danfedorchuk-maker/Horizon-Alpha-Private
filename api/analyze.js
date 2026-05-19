@@ -239,7 +239,7 @@ ${fibContext}
 ${cotContext}
 
 Using ONLY the real data above, write a full institutional market structure briefing:
-1. FIBONACCI STRUCTURE — cite exact levels, identify which price is reacting to
+1. FIBONACCI STRUCTURE — Begin with: "Fibonacci measured from [Swing Low] to [Swing High] over 90 days." Then cite exact levels, identify which price is reacting to.
 2. COT POSITIONING — use exact COT numbers, explain smart money vs speculator behaviour
 3. LIQUIDITY ENGINEERING — stop cluster locations relative to Fibonacci levels
 4. SMART MONEY CONCEPTS — order blocks, fair value gaps, institutional traps
