@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>THE PHILOLOGY LAB | MARKET INTELLIGENCE</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         body { background-color: #000; color: #d4af37; font-family: 'Courier New', monospace; margin: 0; padding: 20px; line-height: 1.6; }
         .container { max-width: 900px; margin: auto; border: 1px solid #333; padding: 40px; background: #050505; box-shadow: 0 0 30px rgba(212, 175, 55, 0.05); }
@@ -17,6 +18,75 @@
         .nav { text-align: center; margin-bottom: 20px; }
         .nav a { color: #888; text-decoration: none; font-size: 0.8rem; margin: 0 15px; }
         .nav a:hover { color: #d4af37; }
+
+        /* Chart section */
+        #chart-section {
+            display: none;
+            margin-top: 25px;
+            border: 1px solid #d4af37;
+            background: #050505;
+        }
+        #chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            border-bottom: 1px solid #333;
+            background: #0a0a0a;
+        }
+        #chart-title {
+            color: #d4af37;
+            font-size: 0.85rem;
+            letter-spacing: 2px;
+        }
+        .chart-timeframe-btns {
+            display: flex;
+            gap: 6px;
+        }
+        .tf-btn {
+            background: #111;
+            color: #888;
+            border: 1px solid #333;
+            padding: 4px 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.75rem;
+            cursor: pointer;
+            letter-spacing: 1px;
+            transition: 0.2s;
+        }
+        .tf-btn:hover, .tf-btn.active {
+            background: #d4af37;
+            color: #000;
+            border-color: #d4af37;
+        }
+        #chart-container {
+            width: 100%;
+            height: 400px;
+            position: relative;
+        }
+        #chart-loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #d4af37;
+            font-size: 0.8rem;
+            letter-spacing: 2px;
+            display: none;
+        }
+        #chart-error {
+            display: none;
+            padding: 20px;
+            color: #888;
+            text-align: center;
+            font-size: 0.8rem;
+        }
+        /* TradingView widget fallback */
+        #tv-widget-container {
+            width: 100%;
+            height: 400px;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -33,60 +103,60 @@
         <label>Select Asset / Commodity:</label>
        <select id="asset" style="height: 450px; background:#000; color:#00ff41; border: 1px solid #00ff41; font-family: 'Courier New', monospace;" size="20">
     <optgroup label="THE 7 MAJORS (USD CORE)">
-        <option value="AUD/USD">AUD/USD (Aussie)</option>
-        <option value="EUR/USD">EUR/USD (Fiber)</option>
-        <option value="GBP/USD">GBP/USD (Cable)</option>
-        <option value="NZD/USD">NZD/USD (Kiwi)</option>
-        <option value="USD/CAD">USD/CAD (Loonie)</option>
-        <option value="USD/CHF">USD/CHF (Swissie)</option>
-        <option value="USD/JPY">USD/JPY (Gopher)</option>
+        <option value="AUD/USD" data-tv="FX:AUDUSD">AUD/USD (Aussie)</option>
+        <option value="EUR/USD" data-tv="FX:EURUSD">EUR/USD (Fiber)</option>
+        <option value="GBP/USD" data-tv="FX:GBPUSD">GBP/USD (Cable)</option>
+        <option value="NZD/USD" data-tv="FX:NZDUSD">NZD/USD (Kiwi)</option>
+        <option value="USD/CAD" data-tv="FX:USDCAD">USD/CAD (Loonie)</option>
+        <option value="USD/CHF" data-tv="FX:USDCHF">USD/CHF (Swissie)</option>
+        <option value="USD/JPY" data-tv="FX:USDJPY">USD/JPY (Gopher)</option>
     </optgroup>
     <optgroup label="THE 21 CROSSES (GLOBAL LIQUIDITY)">
-        <option value="AUD/CAD">AUD/CAD</option>
-        <option value="AUD/CHF">AUD/CHF</option>
-        <option value="AUD/JPY">AUD/JPY</option>
-        <option value="AUD/NZD">AUD/NZD</option>
-        <option value="CAD/CHF">CAD/CHF</option>
-        <option value="CAD/JPY">CAD/JPY</option>
-        <option value="CHF/JPY">CHF/JPY</option>
-        <option value="EUR/AUD">EUR/AUD</option>
-        <option value="EUR/CAD">EUR/CAD</option>
-        <option value="EUR/CHF">EUR/CHF</option>
-        <option value="EUR/GBP">EUR/GBP</option>
-        <option value="EUR/JPY">EUR/JPY</option>
-        <option value="EUR/NZD">EUR/NZD</option>
-        <option value="GBP/AUD">GBP/AUD</option>
-        <option value="GBP/CAD">GBP/CAD</option>
-        <option value="GBP/CHF">GBP/CHF</option>
-        <option value="GBP/JPY">GBP/JPY</option>
-        <option value="GBP/NZD">GBP/NZD</option>
-        <option value="NZD/CAD">NZD/CAD</option>
-        <option value="NZD/CHF">NZD/CHF</option>
-        <option value="NZD/JPY">NZD/JPY</option>
+        <option value="AUD/CAD" data-tv="FX:AUDCAD">AUD/CAD</option>
+        <option value="AUD/CHF" data-tv="FX:AUDCHF">AUD/CHF</option>
+        <option value="AUD/JPY" data-tv="FX:AUDJPY">AUD/JPY</option>
+        <option value="AUD/NZD" data-tv="FX:AUDNZD">AUD/NZD</option>
+        <option value="CAD/CHF" data-tv="FX:CADCHF">CAD/CHF</option>
+        <option value="CAD/JPY" data-tv="FX:CADJPY">CAD/JPY</option>
+        <option value="CHF/JPY" data-tv="FX:CHFJPY">CHF/JPY</option>
+        <option value="EUR/AUD" data-tv="FX:EURAUD">EUR/AUD</option>
+        <option value="EUR/CAD" data-tv="FX:EURCAD">EUR/CAD</option>
+        <option value="EUR/CHF" data-tv="FX:EURCHF">EUR/CHF</option>
+        <option value="EUR/GBP" data-tv="FX:EURGBP">EUR/GBP</option>
+        <option value="EUR/JPY" data-tv="FX:EURJPY">EUR/JPY</option>
+        <option value="EUR/NZD" data-tv="FX:EURNZD">EUR/NZD</option>
+        <option value="GBP/AUD" data-tv="FX:GBPAUD">GBP/AUD</option>
+        <option value="GBP/CAD" data-tv="FX:GBPCAD">GBP/CAD</option>
+        <option value="GBP/CHF" data-tv="FX:GBPCHF">GBP/CHF</option>
+        <option value="GBP/JPY" data-tv="FX:GBPJPY">GBP/JPY</option>
+        <option value="GBP/NZD" data-tv="FX:GBPNZD">GBP/NZD</option>
+        <option value="NZD/CAD" data-tv="FX:NZDCAD">NZD/CAD</option>
+        <option value="NZD/CHF" data-tv="FX:NZDCHF">NZD/CHF</option>
+        <option value="NZD/JPY" data-tv="FX:NZDJPY">NZD/JPY</option>
     </optgroup>
     <optgroup label="SHADOW MARKETS & COMMODITIES">
-        <option value="BALTIC DRY INDEX">Baltic Dry Index (BDI)</option>
-        <option value="STRAIT OF HORMUZ">Hormuz Transit/Risk Data</option>
-        <option value="XAU/USD">Gold Spot (Hard Assets)</option>
-        <option value="XAG/USD">Silver (Monetary Metal)</option>
-        <option value="WTI CRUDE OIL">Energy: WTI Crude</option>
-        <option value="COPPER">Industrial: High Grade Copper</option>
-        <option value="CONTAINER FREIGHT INDEX">SCFI Container Rates</option>
+        <option value="BALTIC DRY INDEX" data-tv="">Baltic Dry Index (BDI)</option>
+        <option value="STRAIT OF HORMUZ" data-tv="">Hormuz Transit/Risk Data</option>
+        <option value="XAU/USD" data-tv="TVC:GOLD">Gold Spot (Hard Assets)</option>
+        <option value="XAG/USD" data-tv="TVC:SILVER">Silver (Monetary Metal)</option>
+        <option value="WTI CRUDE OIL" data-tv="TVC:USOIL">Energy: WTI Crude</option>
+        <option value="COPPER" data-tv="TVC:COPPER">Industrial: High Grade Copper</option>
+        <option value="CONTAINER FREIGHT INDEX" data-tv="">SCFI Container Rates</option>
     </optgroup>
-           <optgroup label="DIGITAL ASSETS (CRYPTO)">
-    <option value="BTC/USD">Bitcoin (Digital Gold)</option>
-    <option value="ETH/USD">Ethereum (Smart Contract Flow)</option>
-</optgroup>
-         <optgroup label="GLOBAL EQUITY INDICES">
-    <option value="S&P 500 (SPX)">S&P 500 (The Market)</option>
-    <option value="NASDAQ 100 (NDX)">NASDAQ 100 (Tech Heavy)</option>
-    <option value="DOW JONES (DJI)">Dow Jones 30 (Blue Chips)</option>
-    <option value="RUSSELL 2000 (RUT)">Russell 2000 (Small Caps)</option>
-    <option value="S&P/TSX COMPOSITE">S&P/TSX (Canada Market)</option>
-    <option value="NIKKEI 225 (NI225)">Nikkei 225 (Japan)</option>
-    <option value="DAX 40 (DAX)">DAX 40 (Germany)</option>
-    <option value="VIX (THE FEAR GAUGE)">VIX (Volatility Index)</option>
-</optgroup>
+    <optgroup label="DIGITAL ASSETS (CRYPTO)">
+        <option value="BTC/USD" data-tv="BITSTAMP:BTCUSD">Bitcoin (Digital Gold)</option>
+        <option value="ETH/USD" data-tv="BITSTAMP:ETHUSD">Ethereum (Smart Contract Flow)</option>
+    </optgroup>
+    <optgroup label="GLOBAL EQUITY INDICES">
+        <option value="S&P 500 (SPX)" data-tv="SP:SPX">S&P 500 (The Market)</option>
+        <option value="NASDAQ 100 (NDX)" data-tv="NASDAQ:NDX">NASDAQ 100 (Tech Heavy)</option>
+        <option value="DOW JONES (DJI)" data-tv="DJ:DJI">Dow Jones 30 (Blue Chips)</option>
+        <option value="RUSSELL 2000 (RUT)" data-tv="TVC:RUT">Russell 2000 (Small Caps)</option>
+        <option value="S&P/TSX COMPOSITE" data-tv="TVC:TSX">S&P/TSX (Canada Market)</option>
+        <option value="NIKKEI 225 (NI225)" data-tv="TVC:NI225">Nikkei 225 (Japan)</option>
+        <option value="DAX 40 (DAX)" data-tv="XETR:DAX">DAX 40 (Germany)</option>
+        <option value="VIX (THE FEAR GAUGE)" data-tv="TVC:VIX">VIX (Volatility Index)</option>
+    </optgroup>
 </select>
 
         <label>Intelligence Pillar:</label>
@@ -96,27 +166,41 @@
             <option value="Macro Sentiment (Central Bank Tone)">Macro Sentiment (Central Bank Tone)</option>
             <option value="Full Market Briefing">Full Market Briefing</option>
             <option value="Shadow Logistics (Hormuz/BDI Impact)">Shadow Logistics (Hormuz/BDI Impact)</option>
-<option value="Options Flow & Pinning Risk">Options Flow & Pinning Risk</option>
+            <option value="Options Flow & Pinning Risk">Options Flow & Pinning Risk</option>
         </select>
 
         <button onclick="generateIntelligence()">EXECUTE MARKET SCAN</button>
     </div>
+
     <div style="margin: 20px 0; padding: 15px; border: 1px solid #00ff00; background: rgba(0, 255, 0, 0.05); font-family: monospace; font-size: 0.9em;">
-    <h3 style="color: #00ff00; margin-top: 0; border-bottom: 1px solid #00ff00;">OPERATIONAL PROTOCOL (PRIVATE ALPHA)</h3>
-    <p style="color: #00ff00;">This terminal cross-references <strong>Shadow Logistics</strong> (Baltic Dry Index, Hormuz Transit) against traditional <strong>Forex & Equity</strong> data to find institutional traps.</p>
-    
-    <ul style="color: #00ff00; list-style-type: '>'; padding-left: 20px;">
-        <li><strong>CONVICTION CHECK:</strong> Use 'Shadow Logistics' to see if physical shipping data supports the current price trend. If price is rising but shipping is stalling, the trend is a <strong>trap</strong>.</li>
-        <li><strong>VOLATILITY HEDGE:</strong> Use 'Options Flow' to identify where the "Big Money" has placed their bets for the Friday close.</li>
-        <li><strong>GOLD/BTC CORRELATION:</strong> Watch the 'Macro Sentiment' pillar. If BTC/USD and Gold move together, the market is pricing in a <strong>Black Swan</strong> event.</li>
-    </ul>
-    
-    <p style="color: #888; font-style: italic; margin-bottom: 0;">*Confidential: This intelligence is anchored to April 2026 risk metrics. Trade with precision.</p>
-</div>
+        <h3 style="color: #00ff00; margin-top: 0; border-bottom: 1px solid #00ff00;">OPERATIONAL PROTOCOL (PRIVATE ALPHA)</h3>
+        <p style="color: #00ff00;">This terminal cross-references <strong>Shadow Logistics</strong> (Baltic Dry Index, Hormuz Transit) against traditional <strong>Forex & Equity</strong> data to find institutional traps.</p>
+        <ul style="color: #00ff00; list-style-type: '>'; padding-left: 20px;">
+            <li><strong>CONVICTION CHECK:</strong> Use 'Shadow Logistics' to see if physical shipping data supports the current price trend. If price is rising but shipping is stalling, the trend is a <strong>trap</strong>.</li>
+            <li><strong>VOLATILITY HEDGE:</strong> Use 'Options Flow' to identify where the "Big Money" has placed their bets for the Friday close.</li>
+            <li><strong>GOLD/BTC CORRELATION:</strong> Watch the 'Macro Sentiment' pillar. If BTC/USD and Gold move together, the market is pricing in a <strong>Black Swan</strong> event.</li>
+        </ul>
+        <p style="color: #888; font-style: italic; margin-bottom: 0;">*Confidential: This intelligence is anchored to April 2026 risk metrics. Trade with precision.</p>
+    </div>
+
+    <!-- CHART SECTION -->
+    <div id="chart-section">
+        <div id="chart-header">
+            <span id="chart-title">LIVE CHART: —</span>
+            <div class="chart-timeframe-btns">
+                <button class="tf-btn active" onclick="setTimeframe('1D', this)">1D</button>
+                <button class="tf-btn" onclick="setTimeframe('1W', this)">1W</button>
+                <button class="tf-btn" onclick="setTimeframe('1M', this)">1M</button>
+                <button class="tf-btn" onclick="setTimeframe('3M', this)">3M</button>
+                <button class="tf-btn" onclick="setTimeframe('12M', this)">1Y</button>
+            </div>
+        </div>
+        <!-- TradingView Widget -->
+        <div id="tv-widget-container"></div>
+        <div id="chart-error">Chart not available for this instrument.</div>
+    </div>
 
     <div id="output">SYSTEM STATUS: READY. Awaiting asset selection...</div>
-
-    
 
     <div class="disclaimer">
         FOR RESEARCH PURPOSES ONLY. NO FINANCIAL ADVICE GIVEN. ALL DECISIONS ARE THE RESPONSIBILITY OF THE USER. 
@@ -125,12 +209,99 @@
 </div>
 
 <script>
+let currentSymbol = '';
+let currentInterval = '1D';
+
+function getSelectedOption() {
+    const sel = document.getElementById('asset');
+    return sel.options[sel.selectedIndex];
+}
+
+function setTimeframe(tf, btn) {
+    currentInterval = tf;
+    document.querySelectorAll('.tf-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    if (currentSymbol) loadTVWidget(currentSymbol, tf);
+}
+
+function intervalToTV(tf) {
+    const map = { '1D': 'D', '1W': 'W', '1M': 'M', '3M': '3M', '12M': '12M' };
+    return map[tf] || 'D';
+}
+
+function loadTVWidget(symbol, tf) {
+    const container = document.getElementById('tv-widget-container');
+    const error = document.getElementById('chart-error');
+
+    container.innerHTML = '';
+    container.style.display = 'block';
+    error.style.display = 'none';
+
+    const script = document.createElement('script');
+    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
+    script.async = true;
+    script.innerHTML = JSON.stringify({
+        autosize: true,
+        symbol: symbol,
+        interval: intervalToTV(tf),
+        timezone: "America/Vancouver",
+        theme: "dark",
+        style: "1",
+        locale: "en",
+        backgroundColor: "#050505",
+        gridColor: "rgba(212,175,55,0.08)",
+        hide_top_toolbar: false,
+        hide_legend: false,
+        save_image: false,
+        calendar: false,
+        support_host: "https://www.tradingview.com"
+    });
+
+    const widgetDiv = document.createElement('div');
+    widgetDiv.className = 'tradingview-widget-container';
+    widgetDiv.style.height = '420px';
+    widgetDiv.style.width = '100%';
+
+    const innerDiv = document.createElement('div');
+    innerDiv.className = 'tradingview-widget-container__widget';
+    innerDiv.style.height = '420px';
+    innerDiv.style.width = '100%';
+
+    widgetDiv.appendChild(innerDiv);
+    widgetDiv.appendChild(script);
+    container.appendChild(widgetDiv);
+}
+
+function showChart(tvSymbol, label) {
+    const section = document.getElementById('chart-section');
+    const title = document.getElementById('chart-title');
+    const error = document.getElementById('chart-error');
+    const container = document.getElementById('tv-widget-container');
+
+    section.style.display = 'block';
+    title.textContent = 'LIVE CHART: ' + label;
+
+    if (!tvSymbol) {
+        container.style.display = 'none';
+        error.style.display = 'block';
+        return;
+    }
+
+    currentSymbol = tvSymbol;
+    loadTVWidget(tvSymbol, currentInterval);
+}
+
 async function generateIntelligence() {
-    const asset = document.getElementById('asset').value;
+    const assetEl = document.getElementById('asset');
+    const asset = assetEl.value;
+    const selectedOption = assetEl.options[assetEl.selectedIndex];
+    const tvSymbol = selectedOption.getAttribute('data-tv') || '';
+    const label = selectedOption.text.split('(')[0].trim();
     const pillar = document.getElementById('pillar').value;
     const output = document.getElementById('output');
 
-   
+    // Show chart immediately
+    showChart(tvSymbol, label);
 
     output.innerHTML = "<i style='color:#d4af37;'>Accessing CFTC and Institutional repositories... Scanning for whale signatures...</i>";
 
@@ -146,7 +317,7 @@ async function generateIntelligence() {
         });
 
         const data = await response.json();
-       if (data.result) {
+        if (data.result) {
             output.innerHTML = marked.parse(data.result);
         } else if (data.error) {
             output.innerHTML = "SYSTEM ERROR: " + data.error;
@@ -158,3 +329,4 @@ async function generateIntelligence() {
 </script>
 
 </body>
+</html>
