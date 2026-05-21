@@ -15,7 +15,7 @@ const handler = async (req, res) => {
   const cfg = tfConfig[timeframe];
   if (!cfg) return res.status(400).json({ error: 'Invalid timeframe' });
 
-  const symbol = pair.replace('/', '');
+  const symbol = encodeURIComponent(pair);
   const isJpy = pair.includes('JPY');
   const pipSize = isJpy ? 0.01 : 0.0001;
   const minMove = cfg.minPips * pipSize;
