@@ -285,6 +285,8 @@ const handler = async (req, res) => {
         totalMissedContinuationPips += maxContinuation;
       }
 
+    } // end main for loop
+
     function summarize(trades) {
       if (!trades.length) return { trades: 0 };
       const wins = trades.filter(t => t.won);
