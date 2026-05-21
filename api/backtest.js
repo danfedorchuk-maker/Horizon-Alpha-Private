@@ -5,11 +5,11 @@ const handler = async (req, res) => {
   const apiKey = process.env.TWELVE_DATA_API_KEY;
 
   const tfConfig = {
-    '5min':  { interval: '5min',  outputsize: 2000, minPips: 10,  windowCandles: 20 },
-    '15min': { interval: '15min', outputsize: 2000, minPips: 20,  windowCandles: 20 },
-    '30min': { interval: '30min', outputsize: 2000, minPips: 30,  windowCandles: 20 },
-    '1h':    { interval: '1h',    outputsize: 2000, minPips: 50,  windowCandles: 20 },
-    '4h':    { interval: '4h',    outputsize: 2000, minPips: 80,  windowCandles: 20 },
+    '5min':  { interval: '5min',  outputsize: 2000, minPips: 10,  windowCandles: 20, bbPips: 10 },
+    '15min': { interval: '15min', outputsize: 2000, minPips: 20,  windowCandles: 20, bbPips: 15 },
+    '30min': { interval: '30min', outputsize: 2000, minPips: 30,  windowCandles: 20, bbPips: 20 },
+    '1h':    { interval: '1h',    outputsize: 2000, minPips: 50,  windowCandles: 20, bbPips: 30 },
+    '4h':    { interval: '4h',    outputsize: 2000, minPips: 80,  windowCandles: 20, bbPips: 30 },
   };
 
   const cfg = tfConfig[timeframe];
@@ -19,6 +19,7 @@ const handler = async (req, res) => {
   const isJpy = pair.includes('JPY');
   const pipSize = isJpy ? 0.01 : 0.0001;
   const minMove = cfg.minPips * pipSize;
+  const bbTube = cfg.bbPips * pipSize; // 30-pip tube threshold
 
   try {
     const url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=${cfg.interval}&outputsize=${cfg.outputsize}&apikey=${apiKey}`;
@@ -35,10 +36,69 @@ const handler = async (req, res) => {
       high: parseFloat(c.high),
       low: parseFloat(c.low),
       close: parseFloat(c.close),
+      volume: parseFloat(c.volume) || 0,
     }));
 
+    // ── HELPERS ───────────────────────────────────────────────────────────────
+
+    // Bollinger Bands (20-period, 2 std dev)
+    function getBB(candles, idx, period=20) {
+      if (idx < period) return null;
+      const slice = candles.slice(idx - period, idx);
+      const closes = slice.map(c => c.close);
+      const mean = closes.reduce((a,b) => a+b, 0) / period;
+      const variance = closes.reduce((s,c) => s + Math.pow(c - mean, 2), 0) / period;
+      const std = Math.sqrt(variance);
+      return { upper: mean + 2*std, lower: mean - 2*std, middle: mean, bandwidth: (4*std) };
+    }
+
+    // Candle pattern detection at swing high
+    function getReversalPattern(candles, idx) {
+      const c = candles[idx];
+      const body = Math.abs(c.close - c.open);
+      const range = c.high - c.low;
+      const upperWick = c.high - Math.max(c.open, c.close);
+      const lowerWick = Math.min(c.open, c.close) - c.low;
+
+      if (range === 0) return 'none';
+
+      // Doji: body < 10% of range
+      if (body / range < 0.1) return 'doji';
+
+      // Spinning top: body < 30% of range, wicks on both sides
+      if (body / range < 0.3 && upperWick > body && lowerWick > body) return 'spinning_top';
+
+      // Shooting star / bearish pin bar at swing high: long upper wick, small body at bottom
+      if (upperWick > body * 2 && upperWick > range * 0.5 && lowerWick < body) return 'shooting_star';
+
+      // Evening star: bearish candle after bullish push (check prev candle)
+      if (idx > 0) {
+        const prev = candles[idx - 1];
+        const prevBullish = prev.close > prev.open;
+        const curBearish = c.close < c.open;
+        if (prevBullish && curBearish && body > range * 0.4) return 'evening_star';
+      }
+
+      return 'none';
+    }
+
+    // Volume check: is swing high volume below peak volume in the move?
+    function isVolumeBelowPeak(candles, swingLowIdx, swingHighIdx) {
+      if (swingHighIdx <= swingLowIdx) return false;
+      const swingHighVol = candles[swingHighIdx].volume;
+      let peakVol = 0;
+      for (let i = swingLowIdx; i <= swingHighIdx; i++) {
+        if (candles[i].volume > peakVol) peakVol = candles[i].volume;
+      }
+      return peakVol > 0 && swingHighVol < peakVol * 0.8; // below 80% of peak
+    }
+
+    // BB squeeze check: bandwidth < bbTube threshold
+    function isBBSqueeze(bb) {
+      return bb && bb.bandwidth < bbTube;
+    }
+
     // ── REGIME DETECTION ──────────────────────────────────────────────────────
-    // Classify each 20-candle window as: 0=consolidation, 1=trending, 2=choppy
     function classifyWindow(slice) {
       const highs = slice.map(c => c.high);
       const lows = slice.map(c => c.low);
@@ -47,10 +107,9 @@ const handler = async (req, res) => {
       const rangeAvg = slice.reduce((s, c) => s + (c.high - c.low), 0) / slice.length;
       const netMove = Math.abs(closes[closes.length - 1] - closes[0]);
       const ratio = rangeTotal > 0 ? netMove / rangeTotal : 0;
-      // Directional ratio: high = trending, low = choppy, medium = consolidating
-      if (ratio > 0.55) return 1; // trending
-      if (rangeTotal < rangeAvg * 2.5) return 0; // consolidation (tight range)
-      return 2; // choppy
+      if (ratio > 0.55) return 1;
+      if (rangeTotal < rangeAvg * 2.5) return 0;
+      return 2;
     }
 
     const W = cfg.windowCandles;
@@ -59,23 +118,19 @@ const handler = async (req, res) => {
       regimes.push(classifyWindow(candles.slice(i - W, i)));
     }
 
-    // Build Markov transition matrix [from][to]
     const matrix = [[0,0,0],[0,0,0],[0,0,0]];
     for (let i = 0; i < regimes.length - 1; i++) {
       matrix[regimes[i]][regimes[i+1]]++;
     }
-    // Normalize rows to probabilities
     const transProb = matrix.map(row => {
       const sum = row.reduce((a,b) => a+b, 0);
       return sum > 0 ? row.map(v => v/sum) : [0.33,0.33,0.34];
     });
 
-    // Current regime (last window)
     const currentRegime = regimes[regimes.length - 1];
     const regimeNames = ['CONSOLIDATION', 'TRENDING', 'CHOPPY'];
     const nextProbs = transProb[currentRegime];
 
-    // Stationary distribution (square matrix ~8 times)
     let mat = transProb.map(r => [...r]);
     for (let s = 0; s < 8; s++) {
       const next = [[0,0,0],[0,0,0],[0,0,0]];
@@ -88,13 +143,19 @@ const handler = async (req, res) => {
     const stationary = mat[0];
 
     // ── FIB BACKTEST ──────────────────────────────────────────────────────────
-    const results = { '38.2': [], '50.0': [], '61.8': [] };
-    const resultsFiltered = { '38.2': [], '50.0': [], '61.8': [] }; // regime-filtered
+    const results       = { '38.2': [], '50.0': [], '61.8': [] };
+    const resultsFiltered = { '38.2': [], '50.0': [], '61.8': [] };
+    const resultsCandle = { '38.2': [], '50.0': [], '61.8': [] }; // reversal candle filter
+    const resultsEarly  = { '38.2': [], '50.0': [], '61.8': [] }; // early BB entry
     const swingLookback = 5;
+    let missedTrades = 0;    // swing happened, never reached 23.6%
+    let totalSwings = 0;
+    let reversalCandleCount = 0;
+    let volumeBelowPeakCount = 0;
+    let bbSqueezeCount = 0;
 
     for (let i = W + swingLookback * 2; i < candles.length - 20; i++) {
       const windowRegime = regimes[i - W] ?? 2;
-      // Only take trades in consolidation windows for filtered results
       const isGoodRegime = windowRegime === 0;
 
       let isSwingLow = true;
@@ -105,61 +166,109 @@ const handler = async (req, res) => {
         if (candles[j] && candles[j].low <= candles[i].low) { isSwingLow = false; break; }
       }
 
-      if (isSwingLow) {
-        const swingLow = candles[i].low;
-        let swingHigh = -1, swingHighIdx = -1;
-        for (let j = i + swingLookback; j < Math.min(i + 50, candles.length - 10); j++) {
-          let isHigh = true;
-          for (let k = j - swingLookback; k < j; k++) {
-            if (candles[k].high >= candles[j].high) { isHigh = false; break; }
-          }
-          if (isHigh && candles[j].high > swingHigh) {
-            swingHigh = candles[j].high;
-            swingHighIdx = j;
-          }
+      if (!isSwingLow) continue;
+
+      const swingLowIdx = i;
+      const swingLow = candles[i].low;
+      let swingHigh = -1, swingHighIdx = -1;
+
+      for (let j = i + swingLookback; j < Math.min(i + 50, candles.length - 10); j++) {
+        let isHigh = true;
+        for (let k = j - swingLookback; k < j; k++) {
+          if (candles[k].high >= candles[j].high) { isHigh = false; break; }
         }
+        if (isHigh && candles[j].high > swingHigh) {
+          swingHigh = candles[j].high;
+          swingHighIdx = j;
+        }
+      }
 
-        if (swingHighIdx === -1) continue;
-        const move = swingHigh - swingLow;
-        if (move < minMove) continue;
+      if (swingHighIdx === -1) continue;
+      const move = swingHigh - swingLow;
+      if (move < minMove) continue;
 
-        const fib236 = swingHigh - move * 0.236;  // entry level (retracement)
-        const fib382 = swingHigh - move * 0.382;  // deeper retracement levels
-        const fib500 = swingHigh - move * 0.500;
-        const fib618 = swingHigh - move * 0.618;
+      totalSwings++;
 
-        // Profit targets are back UP toward swing high from 23.6% entry
-        // 38.2% target = price recovers from 23.6% back to 0% (swing high)
-        // We use fib levels as stop zones and swing high fractions as targets
-        const target382 = fib236 + (swingHigh - fib236) * 0.382;  // 38.2% of remaining move to top
-        const target500 = fib236 + (swingHigh - fib236) * 0.500;
-        const target618 = fib236 + (swingHigh - fib236) * 0.618;
+      // Candle pattern at swing high
+      const pattern = getReversalPattern(candles, swingHighIdx);
+      const hasReversalCandle = pattern !== 'none';
+      if (hasReversalCandle) reversalCandleCount++;
 
-        for (let j = swingHighIdx + 1; j < Math.min(swingHighIdx + 30, candles.length); j++) {
-          if (candles[j].low <= fib236 && candles[j].close > fib236) {
-            const entry = fib236;
-            const stop = fib382; // stop at 38.2% retracement level
-            const targets = { '38.2': target382, '50.0': target500, '61.8': target618 };
+      // Volume at swing high vs peak
+      const volBelowPeak = isVolumeBelowPeak(candles, swingLowIdx, swingHighIdx);
+      if (volBelowPeak) volumeBelowPeakCount++;
 
+      const fib236 = swingHigh - move * 0.236;
+      const fib382 = swingHigh - move * 0.382;
+
+      const target382 = fib236 + (swingHigh - fib236) * 0.382;
+      const target500 = fib236 + (swingHigh - fib236) * 0.500;
+      const target618 = fib236 + (swingHigh - fib236) * 0.618;
+
+      let reachedEntry = false;
+
+      // ── EARLY ENTRY: BB squeeze + volume below peak ──
+      // Look for squeeze in candles after swing high before 23.6% is reached
+      let earlyEntryIdx = -1;
+      let earlyEntryPrice = -1;
+      for (let j = swingHighIdx + 1; j < Math.min(swingHighIdx + 20, candles.length); j++) {
+        if (candles[j].low <= fib236) break; // already past 23.6%, too late for early entry
+        const bb = getBB(candles, j);
+        if (isBBSqueeze(bb) && volBelowPeak) {
+          bbSqueezeCount++;
+          earlyEntryIdx = j;
+          earlyEntryPrice = candles[j].close;
+          break;
+        }
+      }
+
+      // ── STANDARD ENTRY at 23.6% ──
+      for (let j = swingHighIdx + 1; j < Math.min(swingHighIdx + 30, candles.length); j++) {
+        if (candles[j].low <= fib236 && candles[j].close > fib236) {
+          reachedEntry = true;
+          const entry = fib236;
+          const stop = fib382;
+          const targets = { '38.2': target382, '50.0': target500, '61.8': target618 };
+
+          for (const [label, target] of Object.entries(targets)) {
+            let won = false, lost = false;
+            for (let k = j + 1; k < Math.min(j + 40, candles.length); k++) {
+              if (candles[k].high >= target) { won = true; break; }
+              if (candles[k].low <= stop) { lost = true; break; }
+            }
+            if (won || lost) {
+              const profitPips = won
+                ? Math.round((target - entry) / pipSize)
+                : Math.round((stop - entry) / pipSize);
+              const trade = { won, profitPips, time: candles[j].time, swingSize: Math.round(move / pipSize), pattern };
+              results[label].push(trade);
+              if (isGoodRegime) resultsFiltered[label].push(trade);
+              if (hasReversalCandle) resultsCandle[label].push(trade);
+            }
+          }
+
+          // ── EARLY ENTRY results (same trade outcome, different entry price) ──
+          if (earlyEntryIdx !== -1 && earlyEntryPrice > 0) {
+            const earlyStop = fib382;
             for (const [label, target] of Object.entries(targets)) {
               let won = false, lost = false;
-              for (let k = j + 1; k < Math.min(j + 40, candles.length); k++) {
+              for (let k = earlyEntryIdx + 1; k < Math.min(earlyEntryIdx + 50, candles.length); k++) {
                 if (candles[k].high >= target) { won = true; break; }
-                if (candles[k].low <= stop) { lost = true; break; }
+                if (candles[k].low <= earlyStop) { lost = true; break; }
               }
               if (won || lost) {
                 const profitPips = won
-                  ? Math.round((target - entry) / pipSize)
-                  : Math.round((stop - entry) / pipSize);
-                const trade = { won, profitPips, time: candles[j].time, swingSize: Math.round(move / pipSize) };
-                results[label].push(trade);
-                if (isGoodRegime) resultsFiltered[label].push(trade);
+                  ? Math.round((target - earlyEntryPrice) / pipSize)
+                  : Math.round((earlyStop - earlyEntryPrice) / pipSize);
+                resultsEarly[label].push({ won, profitPips, time: candles[earlyEntryIdx].time });
               }
             }
-            break;
           }
+          break;
         }
       }
+
+      if (!reachedEntry) missedTrades++;
     }
 
     function summarize(trades) {
@@ -179,17 +288,30 @@ const handler = async (req, res) => {
       };
     }
 
-    const summary = {};
-    const summaryFiltered = {};
+    const summary = {}, summaryFiltered = {}, summaryCandle = {}, summaryEarly = {};
     for (const label of ['38.2','50.0','61.8']) {
       summary[label] = summarize(results[label]);
       summaryFiltered[label] = summarize(resultsFiltered[label]);
+      summaryCandle[label] = summarize(resultsCandle[label]);
+      summaryEarly[label] = summarize(resultsEarly[label]);
     }
+
+    const missedPct = totalSwings > 0 ? Math.round((missedTrades / totalSwings) * 100) : 0;
 
     return res.status(200).json({
       pair, timeframe,
-      summary, summaryFiltered,
+      summary, summaryFiltered, summaryCandle, summaryEarly,
       candles: candles.length,
+      filters: {
+        totalSwings,
+        missedTrades,
+        missedPct,
+        reversalCandleCount,
+        reversalCandlePct: totalSwings > 0 ? Math.round((reversalCandleCount/totalSwings)*100) : 0,
+        volumeBelowPeakCount,
+        volumeBelowPeakPct: totalSwings > 0 ? Math.round((volumeBelowPeakCount/totalSwings)*100) : 0,
+        bbSqueezeCount,
+      },
       regime: {
         current: regimeNames[currentRegime],
         currentIndex: currentRegime,
@@ -203,7 +325,6 @@ const handler = async (req, res) => {
           trending: Math.round(stationary[1] * 100),
           choppy: Math.round(stationary[2] * 100),
         },
-        transitionMatrix: transProb.map(r => r.map(v => Math.round(v * 100))),
       }
     });
 
