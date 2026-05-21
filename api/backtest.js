@@ -123,16 +123,23 @@ const handler = async (req, res) => {
         const move = swingHigh - swingLow;
         if (move < minMove) continue;
 
-        const fib236 = swingHigh - move * 0.236;
-        const fib382 = swingHigh - move * 0.382;
+        const fib236 = swingHigh - move * 0.236;  // entry level (retracement)
+        const fib382 = swingHigh - move * 0.382;  // deeper retracement levels
         const fib500 = swingHigh - move * 0.500;
         const fib618 = swingHigh - move * 0.618;
+
+        // Profit targets are back UP toward swing high from 23.6% entry
+        // 38.2% target = price recovers from 23.6% back to 0% (swing high)
+        // We use fib levels as stop zones and swing high fractions as targets
+        const target382 = fib236 + (swingHigh - fib236) * 0.382;  // 38.2% of remaining move to top
+        const target500 = fib236 + (swingHigh - fib236) * 0.500;
+        const target618 = fib236 + (swingHigh - fib236) * 0.618;
 
         for (let j = swingHighIdx + 1; j < Math.min(swingHighIdx + 30, candles.length); j++) {
           if (candles[j].low <= fib236 && candles[j].close > fib236) {
             const entry = fib236;
-            const stop = entry - (5 * pipSize);
-            const targets = { '38.2': fib382, '50.0': fib500, '61.8': fib618 };
+            const stop = fib382; // stop at 38.2% retracement level
+            const targets = { '38.2': target382, '50.0': target500, '61.8': target618 };
 
             for (const [label, target] of Object.entries(targets)) {
               let won = false, lost = false;
