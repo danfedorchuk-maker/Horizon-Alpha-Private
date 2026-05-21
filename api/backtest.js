@@ -145,10 +145,12 @@ const handler = async (req, res) => {
     // ── FIB BACKTEST ──────────────────────────────────────────────────────────
     const results       = { '38.2': [], '50.0': [], '61.8': [] };
     const resultsFiltered = { '38.2': [], '50.0': [], '61.8': [] };
-    const resultsCandle = { '38.2': [], '50.0': [], '61.8': [] }; // reversal candle filter
-    const resultsEarly  = { '38.2': [], '50.0': [], '61.8': [] }; // early BB entry
+    const resultsCandle = { '38.2': [], '50.0': [], '61.8': [] };
+    const resultsEarly  = { '38.2': [], '50.0': [], '61.8': [] };
     const swingLookback = 5;
-    let missedTrades = 0;    // swing happened, never reached 23.6%
+    let missedTrades = 0;
+    let missedButContinued = 0;
+    let totalMissedContinuationPips = 0;
     let totalSwings = 0;
     let reversalCandleCount = 0;
     let volumeBelowPeakCount = 0;
@@ -207,14 +209,13 @@ const handler = async (req, res) => {
 
       let reachedEntry = false;
 
-      // ── EARLY ENTRY: BB squeeze + volume below peak ──
-      // Look for squeeze in candles after swing high before 23.6% is reached
+      // ── EARLY ENTRY: BB squeeze only (volume data unreliable on forex) ──
       let earlyEntryIdx = -1;
       let earlyEntryPrice = -1;
       for (let j = swingHighIdx + 1; j < Math.min(swingHighIdx + 20, candles.length); j++) {
-        if (candles[j].low <= fib236) break; // already past 23.6%, too late for early entry
+        if (candles[j].low <= fib236) break;
         const bb = getBB(candles, j);
-        if (isBBSqueeze(bb) && volBelowPeak) {
+        if (isBBSqueeze(bb)) {
           bbSqueezeCount++;
           earlyEntryIdx = j;
           earlyEntryPrice = candles[j].close;
@@ -268,8 +269,21 @@ const handler = async (req, res) => {
         }
       }
 
-      if (!reachedEntry) missedTrades++;
-    }
+      if (!reachedEntry) {
+        missedTrades++;
+        // Track what happened after the missed trade — did price continue up?
+        let maxContinuation = 0;
+        let continuedUp = false;
+        for (let j = swingHighIdx + 1; j < Math.min(swingHighIdx + 40, candles.length); j++) {
+          const pipsMoved = Math.round((candles[j].high - swingHigh) / pipSize);
+          if (pipsMoved > maxContinuation) maxContinuation = pipsMoved;
+          if (pipsMoved > cfg.minPips) { continuedUp = true; break; }
+          // If it drops below 38.2%, the move failed regardless
+          if (candles[j].low <= (swingHigh - move * 0.382)) break;
+        }
+        if (continuedUp) missedButContinued++;
+        totalMissedContinuationPips += maxContinuation;
+      }
 
     function summarize(trades) {
       if (!trades.length) return { trades: 0 };
@@ -297,6 +311,8 @@ const handler = async (req, res) => {
     }
 
     const missedPct = totalSwings > 0 ? Math.round((missedTrades / totalSwings) * 100) : 0;
+    const missedContinuedPct = missedTrades > 0 ? Math.round((missedButContinued / missedTrades) * 100) : 0;
+    const avgMissedPips = missedTrades > 0 ? Math.round(totalMissedContinuationPips / missedTrades) : 0;
 
     return res.status(200).json({
       pair, timeframe,
@@ -306,6 +322,9 @@ const handler = async (req, res) => {
         totalSwings,
         missedTrades,
         missedPct,
+        missedButContinued,
+        missedContinuedPct,
+        avgMissedPips,
         reversalCandleCount,
         reversalCandlePct: totalSwings > 0 ? Math.round((reversalCandleCount/totalSwings)*100) : 0,
         volumeBelowPeakCount,
