@@ -161,13 +161,29 @@ async function runBacktest() {
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 function winClass(wr) { return wr >= 60 ? 'good' : wr >= 45 ? 'ok' : 'bad'; }
 
+function targetGrid(sumObj, targets, bestKey) {
+  return targets.map(t => {
+    const s = sumObj[t];
+    if (!s || !s.trades) return `<div class="target-box"><div class="target-label">${t}%</div><div style="color:#333;font-size:0.75rem;">no trades</div></div>`;
+    return `<div class="target-box ${t === bestKey ? 'highlighted' : ''}">
+      <div class="target-label">TARGET ${t}% ${t === bestKey ? '<span class="best-badge">BEST</span>' : ''}</div>
+      <div class="target-winrate ${winClass(s.winRate)}">${s.winRate}%</div>
+      <div class="target-stat">Trades <span>${s.trades}</span> &nbsp; W/L <span class="positive">${s.wins}</span>/<span class="negative">${s.losses}</span></div>
+      <div class="target-stat">Total pips <span class="${s.totalPips>=0?'positive':'negative'}">${s.totalPips}</span></div>
+      <div class="target-stat">Avg W <span class="positive">${s.avgWinPips}p</span> / L <span class="negative">${s.avgLossPips}p</span></div>
+    </div>`;
+  }).join('');
+}
+
 function appendResult(data) {
-  const { pair, timeframe, summary, summaryFiltered, regime, candles } = data;
+  const { pair, timeframe, summary, summaryFiltered, summaryCandle, summaryEarly, regime, candles, filters } = data;
   const targets = ['38.2','50.0','61.8'];
   const bestAll = targets.reduce((a,b) => (summary[a]?.winRate||0) > (summary[b]?.winRate||0) ? a : b);
-  const bestFiltered = targets.reduce((a,b) => (summaryFiltered[a]?.winRate||0) > (summaryFiltered[b]?.winRate||0) ? a : b);
+  const bestCandle = targets.reduce((a,b) => (summaryCandle[a]?.winRate||0) > (summaryCandle[b]?.winRate||0) ? a : b);
+  const bestEarly = targets.reduce((a,b) => (summaryEarly[a]?.winRate||0) > (summaryEarly[b]?.winRate||0) ? a : b);
 
   const regimeClass = regime.current === 'CONSOLIDATION' ? 'regime-consolidation' : regime.current === 'TRENDING' ? 'regime-trending' : 'regime-choppy';
+  const f = filters || {};
 
   const card = document.createElement('div');
   card.className = 'result-card';
@@ -183,48 +199,32 @@ function appendResult(data) {
           <span class="regime-tag ${regimeClass}">${regime.current}</span>
         </div>
         <div class="regime-prob">
-          Next period probabilities:<br>
-          <span class="${regime.nextProbs.consolidation > 40 ? 'positive' : ''}">Consolidation ${regime.nextProbs.consolidation}%</span> &nbsp;
-          <span>Trending ${regime.nextProbs.trending}%</span> &nbsp;
-          <span class="${regime.nextProbs.choppy > 40 ? 'negative' : ''}">Choppy ${regime.nextProbs.choppy}%</span>
+          Next period:<br>
+          <span class="${regime.nextProbs.consolidation > 40 ? 'positive' : ''}">Consol ${regime.nextProbs.consolidation}%</span> &nbsp;
+          <span>Trend ${regime.nextProbs.trending}%</span> &nbsp;
+          <span class="${regime.nextProbs.choppy > 40 ? 'negative' : ''}">Chop ${regime.nextProbs.choppy}%</span>
         </div>
         <div class="regime-prob">
-          Long-run distribution:<br>
-          <span>Consol ${regime.stationary.consolidation}%</span> &nbsp;
-          <span>Trend ${regime.stationary.trending}%</span> &nbsp;
-          <span>Chop ${regime.stationary.choppy}%</span>
+          Swing stats:<br>
+          <span>Total swings: <span style="color:#ccc">${f.totalSwings||0}</span></span><br>
+          <span class="negative">Missed (never hit 23.6%): <span style="color:#ff3b3b">${f.missedTrades||0} (${f.missedPct||0}%)</span></span>
+        </div>
+        <div class="regime-prob">
+          Signal filters:<br>
+          <span>Reversal candles: <span style="color:#ccc">${f.reversalCandleCount||0} (${f.reversalCandlePct||0}%)</span></span><br>
+          <span>Vol below peak: <span style="color:#ccc">${f.volumeBelowPeakCount||0}</span></span> &nbsp;
+          <span>BB squeeze: <span style="color:#ccc">${f.bbSqueezeCount||0}</span></span>
         </div>
       </div>
 
-      <div class="section-label">ALL TRADES (no regime filter)</div>
-      <div class="target-grid">
-        ${targets.map(t => {
-          const s = summary[t];
-          if (!s || !s.trades) return `<div class="target-box"><div class="target-label">${t}%</div><div style="color:#333;font-size:0.8rem;">no data</div></div>`;
-          return `<div class="target-box ${t === bestAll ? 'highlighted' : ''}">
-            <div class="target-label">TARGET ${t}% ${t === bestAll ? '<span class="best-badge">BEST</span>' : ''}</div>
-            <div class="target-winrate ${winClass(s.winRate)}">${s.winRate}%</div>
-            <div class="target-stat">Trades <span>${s.trades}</span> &nbsp; W/L <span class="positive">${s.wins}</span>/<span class="negative">${s.losses}</span></div>
-            <div class="target-stat">Total pips <span class="${s.totalPips>=0?'positive':'negative'}">${s.totalPips}</span></div>
-            <div class="target-stat">Avg W <span class="positive">${s.avgWinPips}p</span> / L <span class="negative">${s.avgLossPips}p</span></div>
-          </div>`;
-        }).join('')}
-      </div>
+      <div class="section-label">ALL TRADES (no filter)</div>
+      <div class="target-grid">${targetGrid(summary, targets, bestAll)}</div>
 
-      <div class="section-label">CONSOLIDATION REGIME ONLY <span class="filter-badge">FILTERED</span></div>
-      <div class="target-grid">
-        ${targets.map(t => {
-          const s = summaryFiltered[t];
-          if (!s || !s.trades) return `<div class="target-box"><div class="target-label">${t}%</div><div style="color:#333;font-size:0.8rem;">no trades in consolidation</div></div>`;
-          return `<div class="target-box ${t === bestFiltered ? 'highlighted' : ''}">
-            <div class="target-label">TARGET ${t}% ${t === bestFiltered ? '<span class="best-badge">BEST</span>' : ''}</div>
-            <div class="target-winrate ${winClass(s.winRate)}">${s.winRate}%</div>
-            <div class="target-stat">Trades <span>${s.trades}</span> &nbsp; W/L <span class="positive">${s.wins}</span>/<span class="negative">${s.losses}</span></div>
-            <div class="target-stat">Total pips <span class="${s.totalPips>=0?'positive':'negative'}">${s.totalPips}</span></div>
-            <div class="target-stat">Avg W <span class="positive">${s.avgWinPips}p</span> / L <span class="negative">${s.avgLossPips}p</span></div>
-          </div>`;
-        }).join('')}
-      </div>
+      <div class="section-label">REVERSAL CANDLE AT SWING HIGH <span class="filter-badge">FILTERED</span></div>
+      <div class="target-grid">${targetGrid(summaryCandle||{}, targets, bestCandle)}</div>
+
+      <div class="section-label">EARLY ENTRY (BB SQUEEZE + VOL BELOW PEAK) <span class="filter-badge" style="background:#0a84ff;">EARLY</span></div>
+      <div class="target-grid">${targetGrid(summaryEarly||{}, targets, bestEarly)}</div>
 
     </div>
   `;
