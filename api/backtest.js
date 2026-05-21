@@ -25,8 +25,8 @@ const handler = async (req, res) => {
     const response = await fetch(url);
     const data = await response.json();
 
-    if (!data.values || data.values.length < 50) {
-      return res.status(200).json({ error: 'Insufficient data for ' + pair });
+    if (!data.values || data.values.length < 10) {
+      return res.status(200).json({ error: 'Insufficient data for ' + pair + '. API response: ' + JSON.stringify(data).slice(0, 200) });
     }
 
     const candles = data.values.reverse().map(c => ({
