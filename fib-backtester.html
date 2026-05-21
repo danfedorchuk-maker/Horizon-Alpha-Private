@@ -207,7 +207,9 @@ function appendResult(data) {
         <div class="regime-prob">
           Swing stats:<br>
           <span>Total swings: <span style="color:#ccc">${f.totalSwings||0}</span></span><br>
-          <span class="negative">Missed (never hit 23.6%): <span style="color:#ff3b3b">${f.missedTrades||0} (${f.missedPct||0}%)</span></span>
+          <span class="negative">Missed (never hit 23.6%): <span style="color:#ff3b3b">${f.missedTrades||0} (${f.missedPct||0}%)</span></span><br>
+          <span class="${(f.missedContinuedPct||0) > 50 ? 'negative' : ''}">Missed but continued up: <span style="color:#ff9500">${f.missedButContinued||0} (${f.missedContinuedPct||0}%)</span></span><br>
+          <span>Avg pips missed: <span style="color:#ff9500">${f.avgMissedPips||0}p</span></span>
         </div>
         <div class="regime-prob">
           Signal filters:<br>
