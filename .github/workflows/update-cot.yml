@@ -29,19 +29,19 @@ jobs:
           const url = 'https://www.cftc.gov/dea/newcot/f_year.txt';
 
           const TARGETS = {
-            'BRITISH POUND - CHICAGO MERCANTILE EXCHANGE': 'BRITISH POUND',
-            'JAPANESE YEN - CHICAGO MERCANTILE EXCHANGE':  'JAPANESE YEN',
-            'EURO FX - CHICAGO MERCANTILE EXCHANGE':       'EURO FX',
-            'SWISS FRANC - CHICAGO MERCANTILE EXCHANGE':   'SWISS FRANC',
-            'CANADIAN DOLLAR - CHICAGO MERCANTILE EXCHANGE': 'CANADIAN DOLLAR',
-            'AUSTRALIAN DOLLAR - CHICAGO MERCANTILE EXCHANGE': 'AUSTRALIAN DOLLAR',
-            'NEW ZEALAND DOLLAR - CHICAGO MERCANTILE EXCHANGE': 'NEW ZEALAND DOLLAR',
-            'GOLD - COMMODITY EXCHANGE INC.':              'GOLD',
-            'CRUDE OIL, LIGHT SWEET - NEW YORK MERCANTILE EXCHANGE': 'CRUDE OIL',
-            'S&P 500 STOCK INDEX - CHICAGO MERCANTILE EXCHANGE': 'S&P 500',
-            'BITCOIN - CHICAGO MERCANTILE EXCHANGE':       'BITCOIN',
-            'NASDAQ-100 STOCK INDEX (MINI) - CHICAGO MERCANTILE EXCHANGE': 'NASDAQ',
-            'RUSSELL 2000 MINI INDEX FUTURES - CHICAGO MERCANTILE EXCHANGE': 'RUSSELL',
+            'BRITISH POUND': 'BRITISH POUND',
+            'JAPANESE YEN':  'JAPANESE YEN',
+            'EURO FX':       'EURO FX',
+            'SWISS FRANC':   'SWISS FRANC',
+            'CANADIAN DOLLAR': 'CANADIAN DOLLAR',
+            'AUSTRALIAN DOLLAR': 'AUSTRALIAN DOLLAR',
+            'NEW ZEALAND DOLLAR': 'NEW ZEALAND DOLLAR',
+            'GOLD - COMMODITY': 'GOLD',
+            'CRUDE OIL, LIGHT SWEET': 'CRUDE OIL',
+            'S&P 500 STOCK INDEX': 'S&P 500',
+            'BITCOIN - CHICAGO': 'BITCOIN',
+            'NASDAQ-100 STOCK INDEX (MINI)': 'NASDAQ',
+            'RUSSELL 2000 MINI INDEX': 'RUSSELL',
           };
 
           function fetchData(u) {
@@ -65,9 +65,11 @@ jobs:
             for (const line of lines) {
               if (!line.trim()) continue;
               const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
-              const marketName = cols[0];
-              for (const [cftcName, ourKey] of Object.entries(TARGETS)) {
-                if (marketName.toUpperCase().includes(cftcName.toUpperCase().split(' - ')[0])) {
+              const marketName = cols[0].toUpperCase();
+
+              for (const [pattern, ourKey] of Object.entries(TARGETS)) {
+                if (marketName.includes(pattern.toUpperCase())) {
+                  if (result[ourKey]) continue;
                   const date      = cols[2];
                   const oi        = parseInt(cols[7])  || 0;
                   const longSpec  = parseInt(cols[8])  || 0;
@@ -76,7 +78,7 @@ jobs:
                   const shortComm = parseInt(cols[12]) || 0;
                   if (!reportDate && date) reportDate = date + 'T00:00:00.000';
                   result[ourKey] = { oi, longSpec, shortSpec, longComm, shortComm };
-                  console.log('Found: ' + ourKey + ' OI=' + oi);
+                  console.log('Found: ' + ourKey + ' OI=' + oi + ' longComm=' + longComm + ' shortComm=' + shortComm);
                   break;
                 }
               }
@@ -92,19 +94,31 @@ jobs:
               }
             }
 
+            if (!reportDate) {
+              console.log('ERROR: No report date found. Aborting.');
+              process.exit(1);
+            }
+
+            const lines2 = [
+              '  const COT_REPORT_DATE = "' + reportDate + '";',
+              '  const COT_DATA = {'
+            ];
+            for (const [k, v] of Object.entries(result)) {
+              lines2.push('    "' + k + '": { oi: ' + v.oi + ', longSpec: ' + v.longSpec + ', shortSpec: ' + v.shortSpec + ', longComm: ' + v.longComm + ', shortComm: ' + v.shortComm + ' },');
+            }
+            lines2.push('  };');
+
+            const newBlock = '// COT_BLOCK_START\n' + lines2.join('\n') + '\n  // COT_BLOCK_END';
+
             let src = fs.readFileSync('api/analyze.js', 'utf8');
+            const before = src;
 
-            src = src.replace(
-              /const COT_REPORT_DATE = ".*?";/,
-              'const COT_REPORT_DATE = "' + reportDate + '";'
-            );
+            src = src.replace(/\/\/ COT_BLOCK_START[\s\S]*?\/\/ COT_BLOCK_END/, newBlock);
 
-            const lines2 = Object.entries(result).map(([k, v]) =>
-              '    "' + k + '": ' + JSON.stringify(v) + ','
-            );
-            const newBlock = '  const COT_DATA = {\n' + lines2.join('\n') + '\n  };';
-
-            src = src.replace(/const COT_DATA = \{[\s\S]*?\};/, newBlock);
+            if (src === before) {
+              console.log('ERROR: Block markers not found in file. No changes made.');
+              process.exit(1);
+            }
 
             fs.writeFileSync('api/analyze.js', src, 'utf8');
             console.log('Done. Report date: ' + reportDate);
