@@ -13,8 +13,6 @@ const handler = async (req, res) => {
   const { word: asset, tradition: pillar } = req.body || {};
   if (!asset) return res.status(200).json({ result: "SYSTEM ERROR: No asset specified." });
 
-  // ── 1. REAL PRICE DATA FROM TWELVE DATA ──────────────────────────────────────
-
   let priceContext = "";
   let fibContext   = "";
 
@@ -83,25 +81,24 @@ Nearest Support: ${current > fib500 ? fmt(fib500) : fmt(fib618)} | Nearest Resis
 
   // ── 2. COT DATA — auto-updated every Friday via GitHub Action ─────────────────
   // COT_BLOCK_START
-  const COT_REPORT_DATE = "";
-    const COT_DATA = {
-    "BRITISH POUND": {"oi":0,"longSpec":0,"shortSpec":0,"longComm":0,"shortComm":0},
-    "JAPANESE YEN": {"oi":0,"longSpec":0,"shortSpec":0,"longComm":0,"shortComm":0},
-    "EURO FX": {"oi":0,"longSpec":0,"shortSpec":0,"longComm":0,"shortComm":0},
-    "SWISS FRANC": {"oi":0,"longSpec":0,"shortSpec":0,"longComm":0,"shortComm":0},
-    "CANADIAN DOLLAR": {"oi":0,"longSpec":0,"shortSpec":0,"longComm":0,"shortComm":0},
-    "AUSTRALIAN DOLLAR": {"oi":0,"longSpec":0,"shortSpec":0,"longComm":0,"shortComm":0},
-    "NEW ZEALAND DOLLAR": {"oi":0,"longSpec":0,"shortSpec":0,"longComm":0,"shortComm":0},
-    "GOLD": {"oi":0,"longSpec":0,"shortSpec":0,"longComm":0,"shortComm":0},
-    "CRUDE OIL": {"oi":0,"longSpec":0,"shortSpec":0,"longComm":0,"shortComm":0},
-    "S&P 500": {"oi":0,"longSpec":0,"shortSpec":0,"longComm":0,"shortComm":0},
-    "BITCOIN": {"oi":0,"longSpec":0,"shortSpec":0,"longComm":0,"shortComm":0},
-    "NASDAQ": {"oi":0,"longSpec":0,"shortSpec":0,"longComm":0,"shortComm":0},
-    "RUSSELL": {"oi":0,"longSpec":0,"shortSpec":0,"longComm":0,"shortComm":0},
+  const COT_REPORT_DATE = "2026-05-12T00:00:00.000";
+  const COT_DATA = {
+    "BRITISH POUND":      { oi: 283643, longSpec:  79605, shortSpec: 122664, longComm: 169529, shortComm: 124878 },
+    "JAPANESE YEN":       { oi: 362042, longSpec: 100155, shortSpec: 175257, longComm: 203023, shortComm: 128880 },
+    "EURO FX":            { oi: 829377, longSpec: 224002, shortSpec: 183802, longComm: 485382, shortComm: 564436 },
+    "SWISS FRANC":        { oi:  94743, longSpec:   5602, shortSpec:  41799, longComm:  77819, shortComm:  33539 },
+    "CANADIAN DOLLAR":    { oi: 251467, longSpec:  77042, shortSpec:  93284, longComm: 134010, shortComm: 120293 },
+    "AUSTRALIAN DOLLAR":  { oi: 289244, longSpec: 150800, shortSpec:  65810, longComm:  93647, shortComm: 205450 },
+    "NEW ZEALAND DOLLAR": { oi:  86227, longSpec:  11846, shortSpec:  50996, longComm:  71004, shortComm:  29487 },
+    "GOLD":               { oi:      0, longSpec:      0, shortSpec:      0, longComm:      0, shortComm:      0 },
+    "CRUDE OIL":          { oi:      0, longSpec:      0, shortSpec:      0, longComm:      0, shortComm:      0 },
+    "S&P 500":            { oi:  45572, longSpec:  24526, shortSpec:   9692, longComm:  17595, shortComm:   9665 },
+    "BITCOIN":            { oi:  23535, longSpec:  18154, shortSpec:  16895, longComm:    227, shortComm:   2387 },
+    "NASDAQ":             { oi: 287752, longSpec:  57252, shortSpec: 101254, longComm: 118058, shortComm:  27840 },
+    "RUSSELL":            { oi:      0, longSpec:      0, shortSpec:      0, longComm:      0, shortComm:      0 },
   };
   // COT_BLOCK_END
 
-  // Map assets to COT_DATA keys
   const cotMap = {
     "EUR/USD":           ["EURO FX"],
     "GBP/USD":           ["BRITISH POUND"],
@@ -117,27 +114,27 @@ Nearest Support: ${current > fib500 ? fmt(fib500) : fmt(fib618)} | Nearest Resis
     "NASDAQ 100 (NDX)":  ["NASDAQ"],
     "RUSSELL 2000 (RUT)":["RUSSELL"],
     "BTC/USD":           ["BITCOIN"],
-    "GBP/JPY":  ["BRITISH POUND",    "JAPANESE YEN"],
-    "EUR/JPY":  ["EURO FX",          "JAPANESE YEN"],
-    "GBP/AUD":  ["BRITISH POUND",    "AUSTRALIAN DOLLAR"],
-    "EUR/GBP":  ["EURO FX",          "BRITISH POUND"],
-    "AUD/JPY":  ["AUSTRALIAN DOLLAR","JAPANESE YEN"],
-    "EUR/AUD":  ["EURO FX",          "AUSTRALIAN DOLLAR"],
-    "GBP/CHF":  ["BRITISH POUND",    "SWISS FRANC"],
-    "EUR/CHF":  ["EURO FX",          "SWISS FRANC"],
-    "CAD/JPY":  ["CANADIAN DOLLAR",  "JAPANESE YEN"],
+    "GBP/JPY":  ["BRITISH POUND",     "JAPANESE YEN"],
+    "EUR/JPY":  ["EURO FX",           "JAPANESE YEN"],
+    "GBP/AUD":  ["BRITISH POUND",     "AUSTRALIAN DOLLAR"],
+    "EUR/GBP":  ["EURO FX",           "BRITISH POUND"],
+    "AUD/JPY":  ["AUSTRALIAN DOLLAR", "JAPANESE YEN"],
+    "EUR/AUD":  ["EURO FX",           "AUSTRALIAN DOLLAR"],
+    "GBP/CHF":  ["BRITISH POUND",     "SWISS FRANC"],
+    "EUR/CHF":  ["EURO FX",           "SWISS FRANC"],
+    "CAD/JPY":  ["CANADIAN DOLLAR",   "JAPANESE YEN"],
     "NZD/JPY":  ["NEW ZEALAND DOLLAR","JAPANESE YEN"],
-    "CHF/JPY":  ["SWISS FRANC",      "JAPANESE YEN"],
-    "GBP/CAD":  ["BRITISH POUND",    "CANADIAN DOLLAR"],
-    "EUR/CAD":  ["EURO FX",          "CANADIAN DOLLAR"],
-    "AUD/NZD":  ["AUSTRALIAN DOLLAR","NEW ZEALAND DOLLAR"],
-    "AUD/CAD":  ["AUSTRALIAN DOLLAR","CANADIAN DOLLAR"],
-    "GBP/NZD":  ["BRITISH POUND",    "NEW ZEALAND DOLLAR"],
-    "EUR/NZD":  ["EURO FX",          "NEW ZEALAND DOLLAR"],
+    "CHF/JPY":  ["SWISS FRANC",       "JAPANESE YEN"],
+    "GBP/CAD":  ["BRITISH POUND",     "CANADIAN DOLLAR"],
+    "EUR/CAD":  ["EURO FX",           "CANADIAN DOLLAR"],
+    "AUD/NZD":  ["AUSTRALIAN DOLLAR", "NEW ZEALAND DOLLAR"],
+    "AUD/CAD":  ["AUSTRALIAN DOLLAR", "CANADIAN DOLLAR"],
+    "GBP/NZD":  ["BRITISH POUND",     "NEW ZEALAND DOLLAR"],
+    "EUR/NZD":  ["EURO FX",           "NEW ZEALAND DOLLAR"],
     "NZD/CAD":  ["NEW ZEALAND DOLLAR","CANADIAN DOLLAR"],
     "NZD/CHF":  ["NEW ZEALAND DOLLAR","SWISS FRANC"],
-    "AUD/CHF":  ["AUSTRALIAN DOLLAR","SWISS FRANC"],
-    "CAD/CHF":  ["CANADIAN DOLLAR",  "SWISS FRANC"],
+    "AUD/CHF":  ["AUSTRALIAN DOLLAR", "SWISS FRANC"],
+    "CAD/CHF":  ["CANADIAN DOLLAR",   "SWISS FRANC"],
   };
 
   let cotContext = "";
@@ -207,8 +204,6 @@ CROSS INFERENCE:
   } else {
     cotContext = `CFTC does not publish COT data for ${asset}. Analyze via cross-market flows.`;
   }
-
-  // ── 3. GROQ ANALYSIS ─────────────────────────────────────────────────────────
 
   const today = new Date().toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
 
