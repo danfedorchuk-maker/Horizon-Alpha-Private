@@ -1,0 +1,155 @@
+name: Update COT Data
+
+on:
+  schedule:
+    # Every Friday at 3:45 PM ET (20:45 UTC) — 15 min after CFTC release
+    - cron: '45 20 * * 5'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  update-cot:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Fetch and parse CFTC COT data
+        run: |
+          node << 'EOF'
+          const https = require('https');
+          const fs    = require('fs');
+
+          // CFTC Legacy Futures Only — current year
+          const url = 'https://www.cftc.gov/dea/newcot/f_year.txt';
+
+          // Markets we care about — exact CFTC report names
+          const TARGETS = {
+            'BRITISH POUND - CHICAGO MERCANTILE EXCHANGE': 'BRITISH POUND',
+            'JAPANESE YEN - CHICAGO MERCANTILE EXCHANGE':  'JAPANESE YEN',
+            'EURO FX - CHICAGO MERCANTILE EXCHANGE':       'EURO FX',
+            'SWISS FRANC - CHICAGO MERCANTILE EXCHANGE':   'SWISS FRANC',
+            'CANADIAN DOLLAR - CHICAGO MERCANTILE EXCHANGE': 'CANADIAN DOLLAR',
+            'AUSTRALIAN DOLLAR - CHICAGO MERCANTILE EXCHANGE': 'AUSTRALIAN DOLLAR',
+            'NEW ZEALAND DOLLAR - CHICAGO MERCANTILE EXCHANGE': 'NEW ZEALAND DOLLAR',
+            'GOLD - COMMODITY EXCHANGE INC.':              'GOLD',
+            'CRUDE OIL, LIGHT SWEET - NEW YORK MERCANTILE EXCHANGE': 'CRUDE OIL',
+            'S&P 500 STOCK INDEX - CHICAGO MERCANTILE EXCHANGE': 'S&P 500',
+            'BITCOIN - CHICAGO MERCANTILE EXCHANGE':       'BITCOIN',
+            'NASDAQ-100 STOCK INDEX (MINI) - CHICAGO MERCANTILE EXCHANGE': 'NASDAQ',
+            'RUSSELL 2000 MINI INDEX FUTURES - CHICAGO MERCANTILE EXCHANGE': 'RUSSELL',
+          };
+
+          function fetchData(url) {
+            return new Promise((resolve, reject) => {
+              https.get(url, res => {
+                let data = '';
+                res.on('data', chunk => data += chunk);
+                res.on('end', () => resolve(data));
+                res.on('error', reject);
+              }).on('error', reject);
+            });
+          }
+
+          async function main() {
+            console.log('Fetching CFTC report...');
+            const raw = await fetchData(url);
+            const lines = raw.split('\n');
+
+            // CFTC CSV columns (Legacy Futures Only):
+            // 0: Market and Exchange Names
+            // 1: As of Date in Form YYYY-MM-DD
+            // 7: Open Interest (All)
+            // 8: Noncommercial Long
+            // 9: Noncommercial Short
+            // 10: Noncommercial Spreads
+            // 11: Commercial Long
+            // 12: Commercial Short
+
+            const result = {};
+            let reportDate = '';
+
+            for (const line of lines) {
+              if (!line.trim()) continue;
+              const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+              const marketName = cols[0];
+
+              for (const [cftcName, ourKey] of Object.entries(TARGETS)) {
+                if (marketName.toUpperCase().includes(cftcName.toUpperCase().split(' - ')[0])) {
+                  const date     = cols[2];  // Report date
+                  const oi       = parseInt(cols[7])  || 0;
+                  const longSpec = parseInt(cols[8])  || 0;
+                  const shortSpec= parseInt(cols[9])  || 0;
+                  const longComm = parseInt(cols[11]) || 0;
+                  const shortComm= parseInt(cols[12]) || 0;
+
+                  if (!reportDate && date) reportDate = date + 'T00:00:00.000';
+
+                  result[ourKey] = { oi, longSpec, shortSpec, longComm, shortComm };
+                  console.log(`✓ ${ourKey}: OI=${oi} longComm=${longComm} shortComm=${shortComm}`);
+                  break;
+                }
+              }
+            }
+
+            // Ensure all keys exist even if not found
+            const defaults = ['BRITISH POUND','JAPANESE YEN','EURO FX','SWISS FRANC',
+              'CANADIAN DOLLAR','AUSTRALIAN DOLLAR','NEW ZEALAND DOLLAR',
+              'GOLD','CRUDE OIL','S&P 500','BITCOIN','NASDAQ','RUSSELL'];
+            for (const k of defaults) {
+              if (!result[k]) {
+                result[k] = { oi:0, longSpec:0, shortSpec:0, longComm:0, shortComm:0 };
+                console.log(`⚠ ${k}: not found, set to zeros`);
+              }
+            }
+
+            // Read current analyze.js
+            let src = fs.readFileSync('api/analyze.js', 'utf8');
+
+            // Replace COT_REPORT_DATE
+            src = src.replace(
+              /const COT_REPORT_DATE = ".*?";/,
+              `const COT_REPORT_DATE = "${reportDate}";`
+            );
+
+            // Build new COT_DATA block
+            const lines2 = Object.entries(result).map(([k, v]) =>
+              `    "${k}":${ ' '.repeat(Math.max(1, 22 - k.length))}{ oi: ${String(v.oi).padStart(7)},  longSpec: ${String(v.longSpec).padStart(7)}, shortSpec: ${String(v.shortSpec).padStart(7)}, longComm: ${String(v.longComm).padStart(7)}, shortComm: ${String(v.shortComm).padStart(7)} },`
+            );
+            const newBlock = `  const COT_DATA = {\n${lines2.join('\n')}\n  };`;
+
+            src = src.replace(
+              /const COT_DATA = \{[\s\S]*?\};/,
+              newBlock
+            );
+
+            fs.writeFileSync('api/analyze.js', src, 'utf8');
+            console.log(`\nDone. Report date: ${reportDate}`);
+            console.log('analyze.js updated successfully.');
+          }
+
+          main().catch(err => {
+            console.error('FAILED:', err.message);
+            process.exit(1);
+          });
+          EOF
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add api/analyze.js
+          if git diff --staged --quiet; then
+            echo "No changes to commit — COT data unchanged."
+          else
+            git commit -m "chore: auto-update COT data $(date -u +'%Y-%m-%d')"
+            git push
+            echo "COT data pushed — Vercel will redeploy automatically."
+          fi
