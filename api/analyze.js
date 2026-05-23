@@ -82,21 +82,21 @@ Nearest Support: ${current > fib500 ? fmt(fib500) : fmt(fib618)} | Nearest Resis
   }
 
   // ── 2. COT DATA — auto-updated every Friday via GitHub Action ─────────────────
-  const COT_REPORT_DATE = "2026-05-12T00:00:00.000";
-  const COT_DATA = {
-    "BRITISH POUND":      { oi: 283643,  longSpec: 79605,  shortSpec: 122664, longComm: 169529, shortComm: 124878 },
-    "JAPANESE YEN":       { oi: 362042,  longSpec: 100155, shortSpec: 175257, longComm: 203023, shortComm: 128880  },
-    "EURO FX":            { oi: 829377, longSpec: 224002, shortSpec: 183802, longComm: 485382, shortComm: 564436 },
-    "SWISS FRANC":        { oi: 94743,   longSpec: 5602,   shortSpec: 41799,  longComm: 77819,  shortComm: 33539  },
-    "CANADIAN DOLLAR":    { oi: 251467, longSpec: 77042, shortSpec: 93284, longComm: 134010, shortComm: 120293 },
-    "AUSTRALIAN DOLLAR":  { oi: 289244, longSpec: 150800, shortSpec: 65810, longComm: 93647, shortComm: 205450 },
-    "NEW ZEALAND DOLLAR": { oi: 58467,   longSpec: 19205,   shortSpec: 30903,  longComm: 35644,  shortComm: 21625  },
-    "GOLD":               { oi: 0, longSpec: 0, shortSpec: 0, longComm: 0, shortComm: 0 },
-    "CRUDE OIL":          { oi: 0, longSpec: 0, shortSpec: 0, longComm: 0, shortComm: 0 },
-    "S&P 500":            { oi: 45572, longSpec: 24526, shortSpec: 9692, longComm: 17595, shortComm: 9665 },
-    "BITCOIN":            { oi: 23535, longSpec: 18154, shortSpec: 16895, longComm: 227, shortComm: 2387 },
-    "NASDAQ":             { oi: 287752, longSpec: 71239, shortSpec: 87224, longComm: 163373, shortComm: 151110 },
-    "RUSSELL":            { oi: 0, longSpec: 0, shortSpec: 0, longComm: 0, shortComm: 0 },
+  const COT_REPORT_DATE = "";
+    const COT_DATA = {
+    "BRITISH POUND": {"oi":0,"longSpec":0,"shortSpec":0,"longComm":0,"shortComm":0},
+    "JAPANESE YEN": {"oi":0,"longSpec":0,"shortSpec":0,"longComm":0,"shortComm":0},
+    "EURO FX": {"oi":0,"longSpec":0,"shortSpec":0,"longComm":0,"shortComm":0},
+    "SWISS FRANC": {"oi":0,"longSpec":0,"shortSpec":0,"longComm":0,"shortComm":0},
+    "CANADIAN DOLLAR": {"oi":0,"longSpec":0,"shortSpec":0,"longComm":0,"shortComm":0},
+    "AUSTRALIAN DOLLAR": {"oi":0,"longSpec":0,"shortSpec":0,"longComm":0,"shortComm":0},
+    "NEW ZEALAND DOLLAR": {"oi":0,"longSpec":0,"shortSpec":0,"longComm":0,"shortComm":0},
+    "GOLD": {"oi":0,"longSpec":0,"shortSpec":0,"longComm":0,"shortComm":0},
+    "CRUDE OIL": {"oi":0,"longSpec":0,"shortSpec":0,"longComm":0,"shortComm":0},
+    "S&P 500": {"oi":0,"longSpec":0,"shortSpec":0,"longComm":0,"shortComm":0},
+    "BITCOIN": {"oi":0,"longSpec":0,"shortSpec":0,"longComm":0,"shortComm":0},
+    "NASDAQ": {"oi":0,"longSpec":0,"shortSpec":0,"longComm":0,"shortComm":0},
+    "RUSSELL": {"oi":0,"longSpec":0,"shortSpec":0,"longComm":0,"shortComm":0},
   };
 
   // Map assets to COT_DATA keys
