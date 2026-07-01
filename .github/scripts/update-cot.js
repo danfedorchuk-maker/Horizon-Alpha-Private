@@ -81,14 +81,13 @@ async function main() {
   const newBlock = '// COT_BLOCK_START\n' + lines.join('\n') + '\n  // COT_BLOCK_END';
 
   let code = fs.readFileSync('api/analyze.js', 'utf8');
-  const before = code;
-  code = code.replace(/\/\/ COT_BLOCK_START[\s\S]*?\/\/ COT_BLOCK_END/, newBlock);
 
-  if (code === before) {
+  if (!/\/\/ COT_BLOCK_START[\s\S]*?\/\/ COT_BLOCK_END/.test(code)) {
     console.log('ERROR: COT_BLOCK_START/END markers not found in api/analyze.js. Aborting.');
     process.exit(1);
   }
 
+  code = code.replace(/\/\/ COT_BLOCK_START[\s\S]*?\/\/ COT_BLOCK_END/, newBlock);
   fs.writeFileSync('api/analyze.js', code);
   console.log(`\nDone. COT data updated to ${reportDate}`);
 }
