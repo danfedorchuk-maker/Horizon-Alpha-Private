@@ -91,6 +91,7 @@ Nearest Support: ${current > fib500 ? fmt(fib500) : fmt(fib618)} | Nearest Resis
     "AUSTRALIAN DOLLAR":  { oi: 214349, longSpec: 82200, shortSpec: 95212, longComm: 97086, shortComm: 97949 },
     "NEW ZEALAND DOLLAR": { oi: 58467, longSpec: 19205, shortSpec: 30903, longComm: 35644, shortComm: 21625 },
     "GOLD":               { oi: 352167, longSpec: 217028, shortSpec: 35689, longComm: 64579, shortComm: 269983 },
+    "SILVER":             { oi: 108944, longSpec: 35139, shortSpec: 11388, longComm: 30501, shortComm: 70741 },
     "CRUDE OIL":          { oi: 803067, longSpec: 90256, shortSpec: 72832, longComm: 481852, shortComm: 498099 },
     "S&P 500":            { oi: 45572, longSpec: 24526, shortSpec: 9692, longComm: 17595, shortComm: 9665 },
     "BITCOIN":            { oi: 20554, longSpec: 16348, shortSpec: 12824, longComm: 70, shortComm: 3323 },
