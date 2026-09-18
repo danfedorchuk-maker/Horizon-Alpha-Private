@@ -81,22 +81,22 @@ Nearest Support: ${current > fib500 ? fmt(fib500) : fmt(fib618)} | Nearest Resis
 
   // ── 2. COT DATA — auto-updated every Friday via GitHub Action ─────────────────
   // COT_BLOCK_START
-  const COT_REPORT_DATE = "2026-09-08T00:00:00.000";
+  const COT_REPORT_DATE = "2026-09-15T00:00:00.000";
   const COT_DATA = {
-    "BRITISH POUND":      { oi: 318608, longSpec: 73520, shortSpec: 132356, longComm: 205647, shortComm: 148545 },
-    "JAPANESE YEN":       { oi: 499635, longSpec: 178791, shortSpec: 167995, longComm: 249469, shortComm: 263510 },
-    "EURO FX":            { oi: 942464, longSpec: 198509, shortSpec: 241125, longComm: 593162, shortComm: 586432 },
-    "SWISS FRANC":        { oi: 153683, longSpec: 17273, shortSpec: 47258, longComm: 112612, shortComm: 71108 },
-    "CANADIAN DOLLAR":    { oi: 334861, longSpec: 54444, shortSpec: 124943, longComm: 244052, shortComm: 169623 },
-    "AUSTRALIAN DOLLAR":  { oi: 455468, longSpec: 120532, shortSpec: 155402, longComm: 271564, shortComm: 255880 },
+    "BRITISH POUND":      { oi: 314293, longSpec: 69331, shortSpec: 128046, longComm: 129681, shortComm: 72616 },
+    "JAPANESE YEN":       { oi: 542802, longSpec: 237951, shortSpec: 117592, longComm: 149757, shortComm: 274431 },
+    "EURO FX":            { oi: 920035, longSpec: 209000, shortSpec: 235993, longComm: 485267, shortComm: 485057 },
+    "SWISS FRANC":        { oi: 171313, longSpec: 20263, shortSpec: 49251, longComm: 94719, shortComm: 50245 },
+    "CANADIAN DOLLAR":    { oi: 358186, longSpec: 73950, shortSpec: 111527, longComm: 250872, shortComm: 203949 },
+    "AUSTRALIAN DOLLAR":  { oi: 493141, longSpec: 114312, shortSpec: 153218, longComm: 169924, shortComm: 150099 },
     "NEW ZEALAND DOLLAR": { oi: 58467, longSpec: 19205, shortSpec: 30903, longComm: 35644, shortComm: 21625 },
-    "GOLD":               { oi: 411227, longSpec: 261007, shortSpec: 29047, longComm: 54403, shortComm: 324677 },
-    "SILVER":             { oi: 103250, longSpec: 36245, shortSpec: 10196, longComm: 31064, shortComm: 75972 },
-    "CRUDE OIL":          { oi: 753433, longSpec: 62523, shortSpec: 87307, longComm: 476311, shortComm: 454798 },
+    "GOLD":               { oi: 409899, longSpec: 258059, shortSpec: 27721, longComm: 56417, shortComm: 318138 },
+    "SILVER":             { oi: 103745, longSpec: 35395, shortSpec: 10069, longComm: 31827, shortComm: 74527 },
+    "CRUDE OIL":          { oi: 753881, longSpec: 69195, shortSpec: 87040, longComm: 475112, shortComm: 460406 },
     "S&P 500":            { oi: 45572, longSpec: 24526, shortSpec: 9692, longComm: 17595, shortComm: 9665 },
-    "BITCOIN":            { oi: 21083, longSpec: 17600, shortSpec: 16076, longComm: 64, shortComm: 2125 },
-    "NASDAQ":             { oi: 295151, longSpec: 85927, shortSpec: 65032, longComm: 154226, shortComm: 195244 },
-    "RUSSELL":            { oi: 431147, longSpec: 66362, shortSpec: 149197, longComm: 323043, shortComm: 245913 },
+    "BITCOIN":            { oi: 20773, longSpec: 16744, shortSpec: 14276, longComm: 107, shortComm: 2764 },
+    "NASDAQ":             { oi: 325784, longSpec: 85062, shortSpec: 51344, longComm: 175896, shortComm: 224754 },
+    "RUSSELL":            { oi: 496762, longSpec: 78550, shortSpec: 150900, longComm: 362572, shortComm: 293889 },
   };
   // COT_BLOCK_END
 
